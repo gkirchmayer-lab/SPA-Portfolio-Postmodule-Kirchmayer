@@ -665,7 +665,7 @@ async function renderDashboard() {
   if (activeList.length === 0) {
     container.innerHTML = `
       <tr>
-        <td colspan="8" class="py-12 text-center text-zinc-500 text-sm font-mono">
+        <td colspan="7" class="py-12 text-center text-zinc-500 text-sm font-mono">
           No stocks currently listed on this target date.
         </td>
       </tr>
@@ -673,74 +673,7 @@ async function renderDashboard() {
     return;
   }
 
-  // 1. SEQUENTIAL PIOTROSKI F-SCORE CALCULATION (ONE-BY-ONE)
-  // Ensure that all F-scores are calculated one-by-one before sorting or rendering
-  container.innerHTML = `
-    <tr>
-      <td colspan="8" class="py-16 text-center text-zinc-400 text-xs font-mono">
-        <div class="flex flex-col items-center justify-center gap-3.5 max-w-sm mx-auto bg-zinc-950/60 p-6 rounded-xl border border-zinc-800/80">
-          <svg class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span id="calculating-fscores-status" class="text-[11px] font-bold text-zinc-300">Analyzing SEC financials one by one...</span>
-          <div class="w-full bg-zinc-900 rounded-full h-1 overflow-hidden mt-1">
-            <div id="loading-inner-bar" class="bg-blue-500 h-full w-0 transition-all duration-150"></div>
-          </div>
-        </div>
-      </td>
-    </tr>
-  `;
-
-  const fProgress = document.getElementById('fscore-progress-container');
-  if (fProgress) {
-    fProgress.classList.remove('hidden');
-    fProgress.classList.add('flex');
-  }
-
-  const big30Active = stocks.filter(s => BIG_30_TICKERS.includes(s.ticker));
-  const remainingActive = stocks.filter(s => !BIG_30_TICKERS.includes(s.ticker));
-
-  const pBar = document.getElementById('fscore-progress-bar');
-  const pTxt = document.getElementById('fscore-progress-text');
-  const innerBar = document.getElementById('loading-inner-bar');
-  const statusSpan = document.getElementById('calculating-fscores-status');
-
-  let completedCount = 0;
-  const updateProgress = (ticker) => {
-    completedCount++;
-    const pct = Math.round((completedCount / big30Active.length) * 100);
-    if (pBar) pBar.style.width = `${pct}%`;
-    if (pTxt) pTxt.textContent = `${pct}% (${completedCount}/${big30Active.length})`;
-    if (innerBar) innerBar.style.width = `${pct}%`;
-    if (statusSpan) statusSpan.textContent = `Analyzing priority roster: ${ticker} (${completedCount} of ${big30Active.length})`;
-  };
-
-  const fetchPromises = big30Active.map(async (stock) => {
-    if (!fScoresCache[stock.ticker]) {
-      try {
-        const res = await fetch(`/api/fscore?ticker=${stock.ticker}`);
-        if (res.ok) {
-          fScoresCache[stock.ticker] = await res.json();
-        }
-      } catch (error) {
-        console.log(`Failed to calculate F-score for ${stock.ticker}:`, error);
-      }
-    }
-    updateProgress(stock.ticker);
-  });
-
-  await Promise.all(fetchPromises);
-
-  // Kick off remaining stocks F-scores calculation sequentially in the background
-  calculateRemainingInBackground(remainingActive);
-
-  // Once all priority calculated, hide progress container after a small grace delay
-  setTimeout(() => {
-    if (fProgress) fProgress.classList.add('hidden');
-  }, 1000);
-
-  // Clear container loading state
+  // Piotroski F-score calculation is excluded. Render and load timeline instantly.
   container.innerHTML = '';
 
   const { daysCount, label: timelineLabel } = getTimelineDetails();
@@ -873,10 +806,9 @@ async function renderDashboard() {
 
   const sortedSectors = Object.keys(sectorsMap).sort();
 
-  // Sort within sector: Piotroski F-Score (Desc) -> Volatility Year (Asc) -> Volatility Month (Asc)
+  // Sort within sector: Volatility Year (Asc) -> Volatility Month (Asc)
   sortedSectors.forEach(sector => {
     sectorsMap[sector].sort((a, b) => {
-      if (b.scoreVal !== a.scoreVal) return b.scoreVal - a.scoreVal;
       if (a.oneYearVol !== b.oneYearVol) return a.oneYearVol - b.oneYearVol;
       return a.oneMonthVol - b.oneMonthVol;
     });
@@ -931,10 +863,9 @@ async function renderDashboard() {
       return acc + changeFromStart;
     }, 0) / allSectorStocks.length;
 
-    // Calculate averages of ALL companies in the sector for Volatilities & F-Score
+    // Calculate averages of ALL companies in the sector for Volatilities
     const avgOneMonthVolAll = allSectorStocks.reduce((sum, s) => sum + s.oneMonthVol, 0) / allSectorStocks.length;
     const avgOneYearVolAll = allSectorStocks.reduce((sum, s) => sum + s.oneYearVol, 0) / allSectorStocks.length;
-    const avgFScoreAll = allSectorStocks.reduce((sum, s) => sum + s.scoreVal, 0) / allSectorStocks.length;
 
     // Calculate Sector Aggregate MACD Sparkline (from ALL sector stocks)
     const aggregatedMacd = new Array(daysCount).fill(0);
@@ -1004,11 +935,6 @@ async function renderDashboard() {
         </div>
       </td>
       <td class="py-4 px-4 text-center bg-zinc-900/60">
-        <div class="inline-flex items-center justify-center bg-zinc-950 px-2.5 py-1.5 rounded border border-zinc-800 text-xs font-mono text-zinc-400">
-          Avg F: <span class="text-zinc-200 font-black ml-1">${avgFScoreAll.toFixed(1)}/9</span>
-        </div>
-      </td>
-      <td class="py-4 px-4 text-center bg-zinc-900/60">
         <div class="flex flex-col items-center justify-center">
           <span class="font-mono text-xs font-bold text-white">${avgOneMonthVolAll.toFixed(1)}% <span class="text-[9px] text-zinc-500 font-normal">1M</span></span>
           <span class="font-mono text-[10px] text-zinc-400">${avgOneYearVolAll.toFixed(1)}% <span class="text-[9px] text-zinc-500 font-normal">1Y</span></span>
@@ -1029,7 +955,7 @@ async function renderDashboard() {
     const chartSvg = renderSectorMACDChart(allSectorStocks, daysCount);
     
     sectorChartRow.innerHTML = `
-      <td colspan="8" class="py-3 px-6">
+      <td colspan="7" class="py-3 px-6">
         <div class="flex flex-col gap-2 max-w-3xl mx-auto bg-zinc-950/40 p-4 rounded-xl border border-zinc-800/50">
           <div class="flex items-center justify-between border-b border-zinc-800/40 pb-2 mb-1.5">
             <span class="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-wider">${sector} Aggregate MACD Momentum</span>
@@ -1094,9 +1020,6 @@ async function renderDashboard() {
             <span>${stock.macdSig.text}</span>
           </div>
         </td>
-        <td class="py-4 px-4 text-center" id="fscore-cell-${stock.ticker}">
-          ${getFScoreBadgeHtml(stock.ticker, fScoreData)}
-        </td>
         <td class="py-4 px-4 text-center">
           <div class="flex flex-col items-center justify-center">
             <span class="font-mono text-xs font-bold text-white">${stock.oneMonthVol.toFixed(1)}% <span class="text-[9px] text-zinc-500 font-normal">1M</span></span>
@@ -1110,17 +1033,6 @@ async function renderDashboard() {
         </td>
       `;
       container.appendChild(row);
-
-      // Register modal handler instantly on fscore button click
-      const cell = row.querySelector(`#fscore-cell-${stock.ticker}`);
-      if (cell) {
-        const btn = cell.querySelector('button');
-        if (btn && fScoreData) {
-          btn.addEventListener('click', () => {
-            showFScoreDetailsModal(fScoreData);
-          });
-        }
-      }
     });
   });
 
@@ -1966,7 +1878,7 @@ function renderBacktestEquityChart(timeline, tradeEvents) {
   svgs += `<path d="${portfolioAreaPath}" fill="#3b82f6" fill-opacity="0.04" />`;
 
   // Plot Benchmark S&P 100 Line (Left axis, dashed)
-  svgs += `<path d="${sp100Path}" fill="none" stroke="#52525b" stroke-width="1.2" stroke-dasharray="3,3" stroke-linecap="round" />`;
+  svgs += `<path d="${sp100Path}" fill="none" stroke="#f97316" stroke-width="1.2" stroke-dasharray="3,3" stroke-linecap="round" />`;
 
   // Plot Individual Stock Trade Paths (Left axis, anchored to Portfolio Total at buy date to show contribution)
   Object.entries(tradesByTicker).forEach(([ticker, trades]) => {
@@ -2357,20 +2269,6 @@ async function initializeApp() {
     renderDashboard();
   });
 
-  // Modal close buttons
-  const closeModalBtn = document.getElementById('close-fscore-modal');
-  const fscoreModal = document.getElementById('fscore-modal');
-  if (closeModalBtn) {
-    closeModalBtn.addEventListener('click', closeFScoreModal);
-  }
-  if (fscoreModal) {
-    fscoreModal.addEventListener('click', (e) => {
-      if (e.target === fscoreModal) {
-        closeFScoreModal();
-      }
-    });
-  }
-
   // Recalibrate LLM AI Briefing
   const recalibrateBtn = document.getElementById('refresh-ai-briefing');
   if (recalibrateBtn) {
@@ -2456,13 +2354,12 @@ document.addEventListener('DOMContentLoaded', initializeApp);
 function downloadConstituentsCSV() {
   if (!stocks || stocks.length === 0) return;
 
-  const headers = ['Ticker', 'Name', 'Sector', 'Current Price', 'Piotroski F-Score'];
+  const headers = ['Ticker', 'Name', 'Sector', 'Current Price'];
   const rows = stocks.map(s => [
     s.ticker,
     `"${(s.name || '').replace(/"/g, '""')}"`,
     s.sector || 'N/A',
-    s.currentPrice || 'N/A',
-    s.fScore !== undefined ? s.fScore : 'N/A'
+    s.currentPrice || 'N/A'
   ]);
 
   const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');

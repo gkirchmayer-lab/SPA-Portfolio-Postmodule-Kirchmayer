@@ -215,7 +215,7 @@
           <div class="flex flex-wrap items-center gap-4 text-[10px] font-mono">
             <span class="flex items-center gap-1.5"><span class="w-3 h-1 bg-blue-500 inline-block rounded"></span> Total Equity [Left Axis]</span>
             <span class="flex items-center gap-1.5"><span class="w-3 h-1 bg-zinc-500 inline-block rounded"></span> Capital Employed [Right Axis]</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-1 bg-zinc-600 inline-block rounded"></span> S&P 100 [Left Axis]</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-1 bg-orange-500 inline-block rounded"></span> S&P 100 [Left Axis]</span>
           </div>
         </div>
         
@@ -405,15 +405,6 @@
               </svg>
               <span>Export CSV</span>
             </button>
-
-            <!-- Piotroski F-Score Calculation Progress Indicator -->
-            <div id="fscore-progress-container" class="hidden items-center gap-3 bg-zinc-950 border border-zinc-800 px-3 py-1 rounded-lg text-[11px] font-mono">
-              <span class="text-zinc-400">Piotroski Progress:</span>
-              <div class="w-24 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                <div id="fscore-progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-150"></div>
-              </div>
-              <span id="fscore-progress-text" class="text-zinc-300 font-bold">0%</span>
-            </div>
           </div>
           <div class="flex items-center gap-4 text-xs text-zinc-400 font-mono">
             <span class="flex items-center gap-1.5">
@@ -435,7 +426,6 @@
                 <th class="py-4 px-4 font-medium text-center" id="ohlc-header">OHLC Candlestick</th>
                 <th class="py-4 px-4 font-medium text-center" id="macd-header">MACD Momentum</th>
                 <th class="py-4 px-4 font-medium text-center">MACD Signal / Action</th>
-                <th class="py-4 px-4 font-medium text-center">Piotroski F-Score</th>
                 <th class="py-4 px-4 font-medium text-center">Volatility (1M / 1Y)</th>
                 <th class="py-4 px-6 font-medium text-center w-24">Invest Pool</th>
               </tr>
@@ -517,71 +507,6 @@
       </div>
     </footer>
 
-  </div>
-
-  <!-- Piotroski F-Score Detailed Analysis Modal -->
-  <div id="fscore-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-transparent pointer-events-none p-4 transition-all duration-300">
-    <div class="bg-zinc-950/95 border border-zinc-800 rounded-xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col shadow-2xl pointer-events-auto animate-in fade-in zoom-in-95 duration-150">
-      
-      <!-- Modal Header -->
-      <div class="px-5 py-4 border-b border-zinc-800/60 flex justify-between items-center bg-zinc-900/50">
-        <div>
-          <h3 class="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2" id="modal-company-title">
-            AAPL • Apple Inc.
-          </h3>
-        </div>
-        <button id="close-fscore-modal" class="p-1.5 rounded-lg bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 transition-all cursor-pointer">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body (Scrollable) -->
-      <div class="p-5 overflow-y-auto space-y-4 flex-grow text-zinc-300">
-        
-        <!-- Score Circular Gauge & Explanation -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-zinc-900/30 p-4 rounded-xl border border-zinc-800/40">
-          <div class="flex flex-col items-center justify-center">
-            <div class="relative flex items-center justify-center w-24 h-24">
-              <svg class="w-full h-full transform -rotate-90">
-                <circle cx="48" cy="48" r="40" stroke="#18181b" stroke-width="6" fill="transparent" />
-                <circle id="modal-progress-circle" cx="48" cy="48" r="40" stroke="#3b82f6" stroke-width="6" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="83.7" stroke-linecap="round" class="transition-all duration-1000 ease-out" />
-              </svg>
-              <div class="absolute flex flex-col items-center justify-center">
-                <span id="modal-score-number" class="text-2xl font-mono font-black text-white">7</span>
-                <span class="text-[8px] uppercase tracking-wider font-mono text-zinc-500 font-bold">of 9 points</span>
-              </div>
-            </div>
-          </div>
-          <div class="md:col-span-2 space-y-1">
-            <h4 class="text-xs font-bold font-mono uppercase tracking-wider text-white" id="modal-rating-label">Strong Financial Health</h4>
-            <p class="text-xs text-zinc-400 leading-relaxed" id="modal-rating-description">
-              The Piotroski F-Score assesses profitability, leverage, and efficiency.
-            </p>
-            <div id="modal-source-badge" class="inline-flex items-center gap-1 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800/60 text-[10px] font-mono text-zinc-500">
-              <span>Source: SEC EDGAR API</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- The 9 Criteria Breakdown -->
-        <div class="space-y-2">
-          <h4 class="text-xs font-bold font-mono uppercase tracking-widest text-zinc-500">9-Point Checklist Breakdown</h4>
-          <div class="space-y-2" id="criteria-items-container">
-            <!-- Dynamically populated checklist items -->
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="px-5 py-3 border-t border-zinc-800/60 bg-zinc-900/30 flex justify-between items-center text-[9px] font-mono text-zinc-500">
-        <span>STATION.11 Workstation</span>
-        <span class="text-zinc-600">10-K Data Disclosures</span>
-      </div>
-
-    </div>
   </div>
 
   <script type="module" src="./main.js"></script>
