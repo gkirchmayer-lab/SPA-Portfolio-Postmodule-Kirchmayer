@@ -185,23 +185,30 @@ function getDefaultStocksList(dateVal) {
   });
 }
 
-// Load and parse the S&P 100 historical data from backend proxy
+// Load and parse the S&P 100 historical data from backend proxy or local asset on GitHub Pages
 async function loadCSVData() {
   if (csvHistoryData) return csvHistoryData;
   if (isCsvLoading) return;
   
   isCsvLoading = true;
   const indicator = document.getElementById('csv-loading-indicator');
+  const indicatorText = indicator ? indicator.querySelector('span') : null;
   if (indicator) {
+    if (indicatorText) indicatorText.textContent = 'DOWNLOADING S&P 100 CSV...';
     indicator.classList.remove('hidden');
     indicator.classList.add('flex');
   }
   
   try {
-    const url = '/api/stocks-csv';
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to download CSV asset');
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    const formattedBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+    const url = `${formattedBaseUrl}data/sp100_ohlcv_2020_to_latest.csv`;
     
+    console.log(`Fetching S&P 100 historical CSV from path: ${url}`);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to download CSV asset from ${url} (status: ${response.status})`);
+    
+    if (indicatorText) indicatorText.textContent = 'PARSING CSV DATABASE...';
     const csvText = await response.text();
     
     const parsed = Papa.parse(csvText, {
@@ -241,9 +248,20 @@ async function loadCSVData() {
     console.log('Successfully loaded S&P 100 CSV data for', Object.keys(csvHistoryData).length, 'tickers');
   } catch (error) {
     console.error('Error downloading or parsing CSV:', error);
+    if (indicatorText) {
+      indicatorText.textContent = 'ERROR LOADING CSV!';
+      if (indicator) {
+        indicator.classList.remove('hidden');
+        indicator.classList.add('flex');
+        setTimeout(() => {
+          indicator.classList.add('hidden');
+          indicatorText.textContent = 'S&P 100 CSV LOADING...';
+        }, 8000);
+      }
+    }
   } finally {
     isCsvLoading = false;
-    if (indicator) {
+    if (indicator && (!indicatorText || indicatorText.textContent !== 'ERROR LOADING CSV!')) {
       indicator.classList.remove('flex');
       indicator.classList.add('hidden');
     }

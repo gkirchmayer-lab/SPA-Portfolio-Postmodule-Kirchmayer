@@ -30,6 +30,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Download historical S&P 100 CSV asset
+        run: |
+          mkdir -p public/data
+          curl -L -o public/data/sp100_ohlcv_2020_to_latest.csv "https://github.com/gkirchmayer-lab/SPA-Protfolio---Postmodule-Kirchmayer/releases/download/v1.0.0/sp100_ohlcv_2020_to_latest.csv"
+
       - name: Build
         run: npm run build
 
