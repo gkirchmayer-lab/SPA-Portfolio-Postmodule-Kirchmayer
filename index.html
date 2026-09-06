@@ -68,6 +68,44 @@
       </div>
     </section>
 
+    <!-- Historical Timeline Selection Section -->
+    <section class="mb-6 bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div class="flex flex-col w-full md:w-auto">
+        <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Historical Timeline</span>
+        <div class="flex flex-wrap gap-2" id="timeline-selector-container">
+          <button data-timeline="1w" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+            1 Week
+          </button>
+          <button data-timeline="1m" class="timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer">
+            1 Month
+          </button>
+          <button data-timeline="1q" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+            1 Quarter
+          </button>
+          <button data-timeline="1y" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+            1 Year
+          </button>
+          <button data-timeline="5y" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+            5 Years
+          </button>
+          <button data-timeline="ytd" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+            YTD
+          </button>
+          <button data-timeline="manual" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+            Manual Start
+          </button>
+        </div>
+      </div>
+
+      <!-- Manual Start Date Picker Box (Conditional on 'manual' selection) -->
+      <div id="manual-date-picker-box" class="hidden flex-col">
+        <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Starting Date</span>
+        <div class="bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 flex items-center gap-2 shadow-inner">
+          <input type="date" id="manual-start-date" class="bg-transparent text-sm font-mono font-bold text-white outline-none border-none cursor-pointer focus:ring-0 p-0" />
+        </div>
+      </div>
+    </section>
+
     <!-- Main Table Container -->
     <main class="flex-grow">
       <div class="bg-zinc-900/50 border border-zinc-900 rounded-xl overflow-hidden shadow-2xl backdrop-blur-sm">
@@ -101,8 +139,10 @@
                 <th class="py-4 px-6 font-medium">Company Name & Ticker</th>
                 <th class="py-4 px-4 font-medium hidden md:table-cell">Sector</th>
                 <th class="py-4 px-4 font-medium text-right">Price</th>
-                <th class="py-4 px-4 font-medium text-center">15-Day OHLC Candlestick Sparkline</th>
-                <th class="py-4 px-4 font-medium text-center">15-Day MACD Momentum</th>
+                <th class="py-4 px-4 font-medium text-center" id="ohlc-header">OHLC Candlestick</th>
+                <th class="py-4 px-4 font-medium text-center" id="macd-header">MACD Momentum</th>
+                <th class="py-4 px-4 font-medium text-center">MACD Signal / Action</th>
+                <th class="py-4 px-4 font-medium text-center">Piotroski F-Score</th>
                 <th class="py-4 px-6 font-medium text-right w-16">Exclude</th>
               </tr>
             </thead>
@@ -182,6 +222,73 @@
       </div>
     </footer>
 
+  </div>
+
+  <!-- Piotroski F-Score Detailed Analysis Modal -->
+  <div id="fscore-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-md p-4 transition-all duration-300">
+    <div class="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-5 border-b border-zinc-800/60 flex justify-between items-center bg-zinc-900/50">
+        <div>
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded bg-blue-500"></span>
+            <span>Piotroski F-Score Analysis</span>
+          </h3>
+          <p class="text-xs text-zinc-400 font-mono mt-1" id="modal-company-title">Company Ticker • FY2024</p>
+        </div>
+        <button id="close-fscore-modal" class="p-2 rounded-lg bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 transition-all cursor-pointer">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-grow text-zinc-300">
+        
+        <!-- Score Circular Gauge & Explanation -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center bg-zinc-900/30 p-5 rounded-xl border border-zinc-800/40">
+          <div class="flex flex-col items-center justify-center">
+            <div class="relative flex items-center justify-center w-28 h-28">
+              <svg class="w-full h-full transform -rotate-90">
+                <circle cx="56" cy="56" r="48" stroke="#18181b" stroke-width="8" fill="transparent" />
+                <circle id="modal-progress-circle" cx="56" cy="56" r="48" stroke="#3b82f6" stroke-width="8" fill="transparent" stroke-dasharray="301.6" stroke-dashoffset="100.5" stroke-linecap="round" class="transition-all duration-1000 ease-out" />
+              </svg>
+              <div class="absolute flex flex-col items-center justify-center">
+                <span id="modal-score-number" class="text-3xl font-mono font-black text-white">7</span>
+                <span class="text-[9px] uppercase tracking-wider font-mono text-zinc-500 font-bold">of 9 points</span>
+              </div>
+            </div>
+          </div>
+          <div class="md:col-span-2 space-y-2">
+            <h4 class="text-xs font-bold font-mono uppercase tracking-wider text-white" id="modal-rating-label">Strong Financial Health</h4>
+            <p class="text-xs text-zinc-400 leading-relaxed" id="modal-rating-description">
+              The Piotroski F-Score assesses profitability, financial leverage/liquidity, and operating efficiency. Scores of 7-9 indicate robust fundamentals, making them strong candidates for investment.
+            </p>
+            <div id="modal-source-badge" class="inline-flex items-center gap-1.5 bg-zinc-950 px-2 py-1 rounded border border-zinc-800/60 text-[10px] font-mono text-zinc-500">
+              <span>Source: SEC EDGAR API</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- The 9 Criteria Breakdown -->
+        <div class="space-y-3">
+          <h4 class="text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-3">9-Point Checklist Breakdown</h4>
+          <div class="space-y-2" id="criteria-items-container">
+            <!-- Dynamically populated checklist items -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-zinc-800/60 bg-zinc-900/30 flex justify-between items-center text-[10px] font-mono text-zinc-500">
+        <span>STATION.11 Tactical Workstation</span>
+        <span class="text-zinc-600">Calculations based on 10-K disclosures</span>
+      </div>
+
+    </div>
   </div>
 
   <script type="module" src="./main.js"></script>
