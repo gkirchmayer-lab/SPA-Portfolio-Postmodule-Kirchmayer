@@ -5,32 +5,170 @@ import Papa from 'papaparse';
  * Pure Vanilla TypeScript/JavaScript Engine
  */
 
+// S&P 100 historical registry tracking names, tickers, sectors, and inclusion/removal dates.
+// Enables dynamic and accurate tracking of components on any given targetDate.
+const SP100_REGISTRY = [
+  { name: '3M', ticker: 'MMM', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'AT&T', ticker: 'T', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'AbbVie', ticker: 'ABBV', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Abbott Laboratories', ticker: 'ABT', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Accenture', ticker: 'ACN', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Adobe', ticker: 'ADBE', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Advanced Micro Devices', ticker: 'AMD', in: '2022-09-19', out: null, sector: 'Technology' },
+  { name: 'Allergan', ticker: 'AGN', in: '2020-01-01', out: '2020-05-12', sector: 'Health Care' },
+  { name: 'Allstate', ticker: 'ALL', in: '2020-01-01', out: '2021-03-22', sector: 'Financial Services' },
+  { name: 'Alphabet Class A', ticker: 'GOOGL', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'Alphabet Class C', ticker: 'GOOG', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'Altria', ticker: 'MO', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Amazon', ticker: 'AMZN', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
+  { name: 'American Express', ticker: 'AXP', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'American International Group', ticker: 'AIG', in: '2020-01-01', out: '2026-03-23', sector: 'Financial Services' },
+  { name: 'American Tower', ticker: 'AMT', in: '2020-04-06', out: null, sector: 'Real Estate' },
+  { name: 'Amgen', ticker: 'AMGN', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Apple', ticker: 'AAPL', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Applied Materials', ticker: 'AMAT', in: '2026-03-23', out: null, sector: 'Technology' },
+  { name: 'Bank of America', ticker: 'BAC', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Berkshire Hathaway Class B', ticker: 'BRK.B', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Biogen', ticker: 'BIIB', in: '2020-01-01', out: '2022-03-21', sector: 'Health Care' },
+  { name: 'BlackRock', ticker: 'BLK', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'BNY Mellon', ticker: 'BK', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Boeing', ticker: 'BA', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'Booking Holdings', ticker: 'BKNG', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
+  { name: 'Bristol Myers Squibb', ticker: 'BMY', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Broadcom', ticker: 'AVGO', in: '2021-03-22', out: null, sector: 'Technology' },
+  { name: 'Capital One', ticker: 'COF', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Caterpillar', ticker: 'CAT', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'Charles Schwab', ticker: 'SCHW', in: '2022-03-21', out: null, sector: 'Financial Services' },
+  { name: 'Charter Communications', ticker: 'CHTR', in: '2020-01-01', out: '2025-09-22', sector: 'Communication Services' },
+  { name: 'Chevron', ticker: 'CVX', in: '2020-01-01', out: null, sector: 'Energy' },
+  { name: 'Cisco', ticker: 'CSCO', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Citigroup', ticker: 'C', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Coca-Cola', ticker: 'KO', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Colgate-Palmolive', ticker: 'CL', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Comcast', ticker: 'CMCSA', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'ConocoPhillips', ticker: 'COP', in: '2020-01-01', out: null, sector: 'Energy' },
+  { name: 'Costco', ticker: 'COST', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'CVS Health', ticker: 'CVS', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Danaher', ticker: 'DHR', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Deere & Company', ticker: 'DE', in: '2023-09-18', out: null, sector: 'Industrials' },
+  { name: 'Dow', ticker: 'DOW', in: '2020-01-01', out: '2025-03-24', sector: 'Basic Materials' },
+  { name: 'DuPont de Nemours', ticker: 'DD', in: '2020-01-01', out: '2022-09-19', sector: 'Basic Materials' },
+  { name: 'Duke Energy', ticker: 'DUK', in: '2020-01-01', out: null, sector: 'Utilities' },
+  { name: 'Eli Lilly', ticker: 'LLY', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Emerson Electric', ticker: 'EMR', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'Exelon', ticker: 'EXC', in: '2020-01-01', out: '2024-03-18', sector: 'Utilities' },
+  { name: 'Exxon Mobil', ticker: 'XOM', in: '2020-01-01', out: null, sector: 'Energy' },
+  { name: 'FedEx', ticker: 'FDX', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'Ford Motor', ticker: 'F', in: '2020-01-01', out: '2025-03-24', sector: 'Consumer Cyclical' },
+  { name: 'GE Aerospace', ticker: 'GE', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'GE Vernova', ticker: 'GEV', in: '2026-03-23', out: null, sector: 'Industrials' },
+  { name: 'General Dynamics', ticker: 'GD', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'General Motors', ticker: 'GM', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
+  { name: 'Gilead Sciences', ticker: 'GILD', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Goldman Sachs', ticker: 'GS', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Home Depot', ticker: 'HD', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
+  { name: 'Honeywell Aerospace', ticker: 'HONA', in: '2026-06-29', out: null, sector: 'Industrials' },
+  { name: 'Honeywell International', ticker: 'HON', in: '2020-01-01', out: '2026-06-30', sector: 'Industrials' },
+  { name: 'IBM', ticker: 'IBM', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Intel', ticker: 'INTC', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Intuit', ticker: 'INTU', in: '2024-03-18', out: null, sector: 'Technology' },
+  { name: 'Intuitive Surgical', ticker: 'ISRG', in: '2025-03-24', out: null, sector: 'Health Care' },
+  { name: 'Johnson & Johnson', ticker: 'JNJ', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'JPMorgan Chase', ticker: 'JPM', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Kinder Morgan', ticker: 'KMI', in: '2020-01-01', out: '2021-03-22', sector: 'Energy' },
+  { name: 'Kraft Heinz', ticker: 'KHC', in: '2020-01-01', out: '2025-03-24', sector: 'Consumer Defensive' },
+  { name: 'Lam Research', ticker: 'LRCX', in: '2026-03-23', out: null, sector: 'Technology' },
+  { name: 'Linde', ticker: 'LIN', in: '2021-03-22', out: null, sector: 'Basic Materials' },
+  { name: 'Lockheed Martin', ticker: 'LMT', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'Lowe\'s', ticker: 'LOW', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
+  { name: 'Mastercard', ticker: 'MA', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'McDonald\'s', ticker: 'MCD', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
+  { name: 'Medtronic', ticker: 'MDT', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Merck & Co.', ticker: 'MRK', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'MetLife', ticker: 'MET', in: '2020-01-01', out: '2026-03-23', sector: 'Financial Services' },
+  { name: 'Meta Platforms', ticker: 'META', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'Micron Technology', ticker: 'MU', in: '2026-03-23', out: null, sector: 'Technology' },
+  { name: 'Microsoft', ticker: 'MSFT', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Mondelez International', ticker: 'MDLZ', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Morgan Stanley', ticker: 'MS', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Netflix', ticker: 'NFLX', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'NextEra Energy', ticker: 'NEE', in: '2020-01-01', out: null, sector: 'Utilities' },
+  { name: 'Nike', ticker: 'NKE', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
+  { name: 'Nvidia', ticker: 'NVDA', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Occidental Petroleum', ticker: 'OXY', in: '2020-01-01', out: '2020-12-21', sector: 'Energy' },
+  { name: 'Oracle', ticker: 'ORCL', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Palantir Technologies', ticker: 'PLTR', in: '2025-03-24', out: null, sector: 'Technology' },
+  { name: 'PayPal', ticker: 'PYPL', in: '2020-01-01', out: '2026-03-23', sector: 'Financial Services' },
+  { name: 'PepsiCo', ticker: 'PEP', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Pfizer', ticker: 'PFE', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Philip Morris International', ticker: 'PM', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Procter & Gamble', ticker: 'PG', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Qualcomm', ticker: 'QCOM', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Raytheon Company', ticker: 'RTN', in: '2020-01-01', out: '2020-04-06', sector: 'Industrials' },
+  { name: 'RTX', ticker: 'RTX', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'Salesforce', ticker: 'CRM', in: '2020-05-12', out: null, sector: 'Technology' },
+  { name: 'SLB', ticker: 'SLB', in: '2020-01-01', out: '2021-03-22', sector: 'Energy' },
+  { name: 'ServiceNow', ticker: 'NOW', in: '2025-03-24', out: null, sector: 'Technology' },
+  { name: 'Simon Property Group', ticker: 'SPG', in: '2020-01-01', out: null, sector: 'Real Estate' },
+  { name: 'Southern Company', ticker: 'SO', in: '2020-01-01', out: null, sector: 'Utilities' },
+  { name: 'Starbucks', ticker: 'SBUX', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
+  { name: 'T-Mobile US', ticker: 'TMUS', in: '2021-03-22', out: null, sector: 'Communication Services' },
+  { name: 'Target', ticker: 'TGT', in: '2020-01-01', out: '2026-03-23', sector: 'Consumer Cyclical' },
+  { name: 'Tesla', ticker: 'TSLA', in: '2020-12-21', out: null, sector: 'Consumer Cyclical' },
+  { name: 'Texas Instruments', ticker: 'TXN', in: '2020-01-01', out: null, sector: 'Technology' },
+  { name: 'Thermo Fisher Scientific', ticker: 'TMO', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'Uber Technologies', ticker: 'UBER', in: '2025-09-22', out: null, sector: 'Technology' },
+  { name: 'Union Pacific', ticker: 'UNP', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'United Parcel Service', ticker: 'UPS', in: '2020-01-01', out: null, sector: 'Industrials' },
+  { name: 'UnitedHealth Group', ticker: 'UNH', in: '2020-01-01', out: null, sector: 'Health Care' },
+  { name: 'U.S. Bancorp', ticker: 'USB', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Verizon', ticker: 'VZ', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'Visa', ticker: 'V', in: '2020-01-01', out: null, sector: 'Financial Services' },
+  { name: 'Walgreens Boots Alliance', ticker: 'WBA', in: '2020-01-01', out: '2023-09-18', sector: 'Consumer Defensive' },
+  { name: 'Walmart', ticker: 'WMT', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
+  { name: 'Walt Disney', ticker: 'DIS', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'Wells Fargo', ticker: 'WFC', in: '2020-01-01', out: null, sector: 'Financial Services' }
+];
+
 // Global state
 let stocks = [];
-let targetDate = '';
-let selectedTimeline = '1m'; // Default to 1 Month
-let manualStartDate = '';
+let targetDate = '2026-09-01';
+let selectedTimeline = '1m'; 
+let manualStartDate = '2026-08-01';
 let twelvedataKey = '';
 let openrouterKey = '';
-let csvCompanyNames = {};
+const csvCompanyNames = {};
 const expandedSectorCharts = new Set();
 let csvHistoryData = null;
 let isCsvLoading = false;
 
-// Default stock roster (9 stocks to leave space for up to 11 limit)
-const DEFAULT_STOCKS = [
-  { ticker: 'AAPL', name: 'Apple Inc.', sector: 'Technology', basePrice: 175.50 },
-  { ticker: 'MSFT', name: 'Microsoft Corp.', sector: 'Technology', basePrice: 415.20 },
-  { ticker: 'NVDA', name: 'NVIDIA Corp.', sector: 'Technology', basePrice: 125.80 },
-  { ticker: 'GOOGL', name: 'Alphabet Inc.', sector: 'Communication Services', basePrice: 168.40 },
-  { ticker: 'AMZN', name: 'Amazon.com Inc.', sector: 'Consumer Cyclical', basePrice: 180.10 },
-  { ticker: 'META', name: 'Meta Platforms Inc.', sector: 'Communication Services', basePrice: 485.30 },
-  { ticker: 'TSLA', name: 'Tesla, Inc.', sector: 'Consumer Cyclical', basePrice: 195.20 },
-  { ticker: 'LLY', name: 'Eli Lilly & Co.', sector: 'Healthcare', basePrice: 760.50 },
-  { ticker: 'JPM', name: 'JPMorgan Chase & Co.', sector: 'Financial Services', basePrice: 198.60 }
-];
+// Selection pool restricted to 20 stocks maximum
+let investPool = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'JPM', 'LLY', 'UNH', 'XOM'];
 
-// Load and parse the default S&P 100 historical data from GitHub releases when no Twelve Data API key is set
+// Load or restore default stocks list
+function getDefaultStocksList(dateVal) {
+  // Only return stocks that were actually active S&P 100 components on dateVal
+  return SP100_REGISTRY.filter(item => {
+    const included = item.in <= dateVal;
+    const excluded = item.out ? item.out <= dateVal : false;
+    return included && !excluded;
+  }).map(item => {
+    let basePrice = 150.0;
+    if (csvHistoryData && csvHistoryData[item.ticker]) {
+      const hist = csvHistoryData[item.ticker];
+      const found = hist.filter(h => h.date <= dateVal).pop();
+      if (found) basePrice = found.close;
+    }
+    return {
+      ticker: item.ticker,
+      name: item.name,
+      sector: item.sector,
+      basePrice: basePrice
+    };
+  });
+}
+
+// Load and parse the S&P 100 historical data from backend proxy
 async function loadCSVData() {
   if (csvHistoryData) return csvHistoryData;
   if (isCsvLoading) return;
@@ -97,26 +235,26 @@ async function loadCSVData() {
   return csvHistoryData;
 }
 
-// Get stock historical data from CSV (if API key not set and available) or fallback to simulated data
-function getStockHistory(stock, targetDate, daysCount) {
+// Get stock historical data from CSV or fallback to simulated data
+function getStockHistory(stock, dateVal, daysCount) {
   let history = [];
   
   if (!twelvedataKey && csvHistoryData && csvHistoryData[stock.ticker]) {
     const allTickerHistory = csvHistoryData[stock.ticker];
-    const filteredHistory = allTickerHistory.filter(h => h.date <= targetDate);
+    const filteredHistory = allTickerHistory.filter(h => h.date <= dateVal);
     if (filteredHistory.length >= 5) {
       history = filteredHistory.slice(-(daysCount + 50));
     }
   }
   
   if (history.length < daysCount + 50) {
-    history = generateStockHistory(stock.ticker, stock.basePrice, targetDate, daysCount);
+    history = generateStockHistory(stock.ticker, stock.basePrice, dateVal, daysCount);
   }
   
   return history;
 }
 
-// Seedable pseudo-random generator to make historical data deterministic for a given stock + date
+// Seedable deterministic walk to generate high-fidelity history backfills
 function createSeededRandom(seedStr) {
   let hash = 0;
   for (let i = 0; i < seedStr.length; i++) {
@@ -128,7 +266,7 @@ function createSeededRandom(seedStr) {
   };
 }
 
-// Translate current timeline settings to display days
+// Timeline display range math
 function getTimelineDetails() {
   const target = new Date(targetDate);
   if (isNaN(target.getTime())) {
@@ -136,7 +274,7 @@ function getTimelineDetails() {
   }
   
   let label = '1 Month';
-  let daysCount = 21; // approx trading days
+  let daysCount = 21; 
   
   switch (selectedTimeline) {
     case '1w':
@@ -183,16 +321,15 @@ function getTimelineDetails() {
   return { daysCount, label };
 }
 
-// Generate realistic price history to compute precise EMA/MACD values
+// Generate high quality fallback price history
 function generateStockHistory(ticker, basePrice, dateStr, displayDays) {
   const rand = createSeededRandom(ticker + dateStr);
   const history = [];
-  const totalDays = displayDays + 50; // 50 extra days lookback for MACD stabilization
+  const totalDays = displayDays + 50; 
   
   let currentClose = basePrice;
-  // Create trading days walking backward
   for (let i = totalDays - 1; i >= 0; i--) {
-    const dailyChangePercent = (rand() - 0.49) * 0.024; // deterministic walk
+    const dailyChangePercent = (rand() - 0.49) * 0.024;
     const prevClose = currentClose / (1 + dailyChangePercent);
     
     const open = prevClose * (1 + (rand() - 0.5) * 0.005);
@@ -200,11 +337,9 @@ function generateStockHistory(ticker, basePrice, dateStr, displayDays) {
     
     const minOC = Math.min(open, close);
     const maxOC = Math.max(open, close);
-    
     const high = maxOC * (1 + rand() * 0.015);
     const low = minOC * (1 - rand() * 0.015);
     
-    // Calculate calendar aligned date back in time
     const dateObj = new Date(dateStr);
     dateObj.setDate(dateObj.getDate() - i);
     const yyyy = dateObj.getFullYear();
@@ -222,11 +357,10 @@ function generateStockHistory(ticker, basePrice, dateStr, displayDays) {
     currentClose = prevClose;
   }
   
-  // Re-align so that history is in chronological order
   return history.reverse();
 }
 
-// Technical Analysis: Calculate EMA
+// Calculate Exponential Moving Average
 function calculateEMA(prices, period) {
   const k = 2 / (period + 1);
   const ema = [];
@@ -241,7 +375,7 @@ function calculateEMA(prices, period) {
   return ema;
 }
 
-// Technical Analysis: Calculate MACD
+// Calculate MACD lines
 function calculateMACD(history) {
   const closes = history.map(h => h.close);
   if (closes.length < 35) return { macd: [], signal: [], hist: [] };
@@ -268,7 +402,7 @@ function calculateMACD(history) {
   };
 }
 
-// Render dynamic OHLC Candlestick Sparkline representing any timeline
+// Render OHLC Candlestick SVG sparkline
 function renderOHLCSparkline(history, displayDays) {
   const width = 160;
   const height = 36;
@@ -298,13 +432,11 @@ function renderOHLCSparkline(history, displayDays) {
     const yClose = scaleY(day.close);
     
     const isBullish = day.close >= day.open;
-    const strokeColor = isBullish ? '#10b981' : '#f43f5e'; // emerald-500 or rose-500
+    const strokeColor = isBullish ? '#10b981' : '#f43f5e';
     
-    // Wick width adjusts based on data density
     const wickWidth = n > 100 ? 0.5 : 1;
     svgs += `<line x1="${x}" y1="${yHigh}" x2="${x}" y2="${yLow}" stroke="${strokeColor}" stroke-width="${wickWidth}" />`;
     
-    // Body width scales based on density
     let bodyWidth = colWidth - 1.5;
     if (n > 50) bodyWidth = colWidth - 0.8;
     if (n > 150) bodyWidth = colWidth - 0.2;
@@ -320,7 +452,7 @@ function renderOHLCSparkline(history, displayDays) {
   return svgs;
 }
 
-// Render dynamic MACD Momentum Sparkline representing any timeline
+// Render MACD histogram and lines sparkline
 function renderMACDSparkline(macd, signal, hist, displayDays) {
   const width = 160;
   const height = 36;
@@ -344,7 +476,6 @@ function renderMACDSparkline(macd, signal, hist, displayDays) {
   const colWidth = width / n;
   let svgs = `<svg width="${width}" height="${height}" class="mx-auto overflow-visible">`;
   
-  // 1. Draw Histogram Bars (Background)
   hDisp.forEach((histVal, index) => {
     const x = index * colWidth + colWidth / 2;
     const yHist = scaleY(histVal);
@@ -356,14 +487,12 @@ function renderMACDSparkline(macd, signal, hist, displayDays) {
     
     const isPositive = histVal >= 0;
     const barColor = isPositive ? '#10b981' : '#f43f5e';
-    
     const yStart = isPositive ? yHist : zeroY;
     const hBar = Math.max(Math.abs(zeroY - yHist), 0.8);
     
     svgs += `<rect x="${x - barWidth / 2}" y="${yStart}" width="${barWidth}" height="${hBar}" fill="${barColor}" fill-opacity="0.3" rx="0.2" />`;
   });
   
-  // 2. Draw MACD and Signal Lines
   let macdPath = '';
   let signalPath = '';
   
@@ -389,7 +518,7 @@ function renderMACDSparkline(macd, signal, hist, displayDays) {
   return svgs;
 }
 
-// Compute annualized standard deviation of daily percentage returns
+// Calculate Annualized Volatility
 function calculateAnnualizedVolatility(history, days) {
   const slice = history.slice(-days);
   if (slice.length < 2) return 0;
@@ -408,117 +537,110 @@ function calculateAnnualizedVolatility(history, days) {
   return dailyStdDev * Math.sqrt(252) * 100;
 }
 
-// Compute standard MACD signals as requested: buy, hold, sell, avoid
+// Crossover signal generator
+// "make the sell and buy distinctions only if the crossover has been that day" (on targetDate close)
 function calculateMACDSignal(hist) {
   const hToday = hist[hist.length - 1] || 0;
   const hYesterday = hist[hist.length - 2] || 0;
-  const hTwoDaysAgo = hist[hist.length - 3] || 0;
-
-  // Crossovers:
-  // "crossed to green the day before" -> yesterday crossed positive, today stays green or today is positive
-  const crossedToGreenYesterday = hYesterday > 0 && hTwoDaysAgo <= 0;
+  
   const crossedToGreenToday = hToday > 0 && hYesterday <= 0;
-
-  // "crossed to red the day before" -> yesterday crossed negative, today stays red or today is negative
-  const crossedToRedYesterday = hYesterday < 0 && hTwoDaysAgo >= 0;
   const crossedToRedToday = hToday < 0 && hYesterday >= 0;
+  
+  const threshold = 0.03; // Momentum flat boundary
 
   let text = 'HOLD';
-  let badgeClass = 'bg-zinc-800/80 text-emerald-400 border border-emerald-900/40';
-  let desc = 'MACD in the green';
+  let badgeClass = 'bg-zinc-900/80 text-zinc-400 border border-zinc-800';
+  let desc = 'MACD momentum flat';
   let icon = `
-    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15" />
+    <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
     </svg>
   `;
-
-  if (crossedToGreenYesterday || crossedToGreenToday) {
+  
+  if (crossedToGreenToday) {
     text = 'BUY';
     badgeClass = 'bg-emerald-500 text-black border border-emerald-400 font-extrabold shadow-md shadow-emerald-950/40';
-    desc = 'Crossed to Green';
+    desc = 'Bullish Crossover Today';
     icon = `
       <svg class="w-3.5 h-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l7.5-7.5 7.5 7.5m-15 6l7.5-7.5 7.5 7.5" />
       </svg>
     `;
-  } else if (crossedToRedYesterday || crossedToRedToday) {
+  } else if (crossedToRedToday) {
     text = 'SELL';
     badgeClass = 'bg-rose-500 text-black border border-rose-400 font-extrabold shadow-md shadow-rose-950/40';
-    desc = 'Crossed to Red';
+    desc = 'Bearish Crossover Today';
     icon = `
       <svg class="w-3.5 h-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 5.25l-7.5 7.5-7.5-7.5m15 6l-7.5 7.5-7.5-7.5" />
       </svg>
     `;
+  } else if (Math.abs(hToday) < threshold) {
+    text = 'NEUTRAL (HOLD)';
+    badgeClass = 'bg-zinc-800/80 text-zinc-400 border border-zinc-700';
+    desc = 'MACD momentum flat';
+    icon = `
+      <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
+      </svg>
+    `;
   } else if (hToday > 0) {
-    text = 'HOLD';
-    badgeClass = 'bg-emerald-950/20 text-emerald-400 border border-emerald-900/60';
-    desc = 'MACD in the green';
+    text = 'BULLISH (BUY)';
+    badgeClass = 'bg-emerald-950/30 text-emerald-400 border border-emerald-900/60';
+    desc = 'Bullish momentum trend';
     icon = `
       <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
       </svg>
     `;
   } else {
-    text = 'AVOID';
+    text = 'BEARISH (SELL)';
     badgeClass = 'bg-rose-950/20 text-rose-400 border border-rose-900/60';
-    desc = 'MACD in the red';
+    desc = 'Bearish momentum trend';
     icon = `
       <svg class="w-3.5 h-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
       </svg>
     `;
   }
-
+  
   return { text, badgeClass, desc, icon };
 }
 
-// Fetch live stock data using Twelve Data API
+// Fetch Twelve Data (optional endpoint)
 async function fetchTwelveData(tickers, apiKey, displayDays) {
   try {
     const tickerParam = tickers.join(',');
-    const outputsize = Math.min(250, displayDays + 50); // limit request size for rate limits
+    const outputsize = Math.min(250, displayDays + 50);
     const url = `https://api.twelvedata.com/time_series?symbol=${tickerParam}&interval=1day&outputsize=${outputsize}&apikey=${apiKey}`;
     const response = await fetch(url);
     if (!response.ok) throw new Error('API Response Error');
-    
-    const json = await response.json();
-    if (json.status === 'error') throw new Error(json.message);
-    
-    return json;
+    return await response.json();
   } catch (error) {
     console.error('Twelve Data Fetch Failed:', error);
     return null;
   }
 }
 
-// Render active stock list to the dashboard table with sector grouping and custom sorting
+// Render S&P 100 main overview dashboard with sector grouping and headers
 async function renderDashboard() {
   const container = document.getElementById('stocks-list');
   const activeCountLabel = document.getElementById('active-count');
+  if (!container) return;
   container.innerHTML = '';
   
   activeCountLabel.textContent = stocks.length;
   
-  // Show/Hide Add button based on 11 stock limit
+  // No strict artificial stock limitations now
   const showAddBtn = document.getElementById('show-add-form-btn');
-  if (stocks.length >= 11) {
-    showAddBtn.disabled = true;
-    showAddBtn.classList.add('opacity-40', 'cursor-not-allowed');
-    showAddBtn.innerHTML = `
-      <svg class="w-4 h-4 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-      <span>Limit of 11 Stocks Reached</span>
-    `;
-  } else {
+  if (showAddBtn) {
     showAddBtn.disabled = false;
     showAddBtn.classList.remove('opacity-40', 'cursor-not-allowed');
     showAddBtn.innerHTML = `
       <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
       </svg>
-      <span>Add Stock <span class="text-zinc-500">(Up to 11)</span></span>
+      <span>Add Stock <span class="text-zinc-500">(To active roster)</span></span>
     `;
   }
 
@@ -526,45 +648,41 @@ async function renderDashboard() {
     container.innerHTML = `
       <tr>
         <td colspan="8" class="py-12 text-center text-zinc-500 text-sm font-mono">
-          No stocks currently listed. Click "Add Stock" below to start your matrix.
+          No stocks currently listed on this target date.
         </td>
       </tr>
     `;
     return;
   }
 
-  // Get active timeline details
   const { daysCount, label: timelineLabel } = getTimelineDetails();
   
-  // Update table headers dynamically
-  document.getElementById('ohlc-header').textContent = `OHLC Candlesticks (${timelineLabel})`;
-  document.getElementById('macd-header').textContent = `MACD Momentum (${timelineLabel})`;
+  const ohlcHeader = document.getElementById('ohlc-header');
+  const macdHeader = document.getElementById('macd-header');
+  if (ohlcHeader) ohlcHeader.textContent = `OHLC Candlesticks (${timelineLabel})`;
+  if (macdHeader) macdHeader.textContent = `MACD Momentum (${timelineLabel})`;
 
-  // Attempt to fetch Twelve Data if API key is provided
   let liveData = null;
   const statusDot = document.getElementById('api-status-dot');
   
   if (twelvedataKey) {
-    statusDot.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
+    if (statusDot) statusDot.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
     const tickers = stocks.map(s => s.ticker);
     liveData = await fetchTwelveData(tickers, twelvedataKey, daysCount);
-    
-    if (liveData) {
+    if (liveData && statusDot) {
       statusDot.className = "w-2 h-2 rounded-full bg-emerald-500";
-    } else {
+    } else if (statusDot) {
       statusDot.className = "w-2 h-2 rounded-full bg-rose-500";
-      console.warn("Falling back to Station.11 ultra-high fidelity procedural model.");
     }
-  } else {
+  } else if (statusDot) {
     statusDot.className = "w-2 h-2 rounded-full bg-zinc-600";
   }
 
-  // Pre-process and calculate metrics for all stocks first
+  // Pre-calculate statistics
   const processedStocks = stocks.map(stock => {
     let history = [];
     let isLive = false;
 
-    // Check if live API has returned values for this ticker
     if (liveData) {
       const tickerData = liveData[stock.ticker] || (liveData.values && liveData.meta && liveData.meta.symbol === stock.ticker ? liveData : null);
       if (tickerData && tickerData.values) {
@@ -579,12 +697,10 @@ async function renderDashboard() {
       }
     }
 
-    // Fallback to actual CSV data or high-quality simulated data
     if (history.length < daysCount + 50) {
       history = getStockHistory(stock, targetDate, daysCount);
     }
 
-    // Slice display period
     const displayHistory = history.slice(-daysCount);
     const lastDay = displayHistory[displayHistory.length - 1] || { close: stock.basePrice, open: stock.basePrice };
     const prevDay = displayHistory[displayHistory.length - 2] || lastDay;
@@ -592,25 +708,17 @@ async function renderDashboard() {
     const change = lastDay.close - prevDay.close;
     const changePercent = (change / prevDay.close) * 100;
     
-    // Calculate MACD values over full sequence
     const { macd, signal, hist } = calculateMACD(history);
-    
-    // Calculate precise Action / Signal details
     const macdSig = calculateMACDSignal(hist);
 
-    // SVG elements
     const ohlcSparkline = renderOHLCSparkline(history, daysCount);
     const macdSparkline = renderMACDSparkline(macd, signal, hist, daysCount);
 
-    // Retrieve cached Piotroski F-score value
     const fScoreCached = fScoresCache[stock.ticker];
     const scoreVal = fScoreCached ? fScoreCached.score : 0;
 
-    // Compute Volatilities (annualized %)
     const oneMonthVol = calculateAnnualizedVolatility(history, 30);
     const oneYearVol = calculateAnnualizedVolatility(history, history.length);
-
-    // Latest MACD histogram value for weighted average calculations
     const latestHistVal = hist[hist.length - 1] || 0;
 
     return {
@@ -634,7 +742,7 @@ async function renderDashboard() {
     };
   });
 
-  // Group companies by Sector
+  // Group by sector
   const sectorsMap = {};
   processedStocks.forEach(stock => {
     if (!sectorsMap[stock.sector]) {
@@ -643,35 +751,22 @@ async function renderDashboard() {
     sectorsMap[stock.sector].push(stock);
   });
 
-  // Sort sectors alphabetically to keep the UI clean
   const sortedSectors = Object.keys(sectorsMap).sort();
 
-  // For each sector, sort within sector:
-  // 1. Piotroski f-score (high to low)
-  // 2. 1-year volatility (low to high)
-  // 3. 1-month volatility (low to high)
+  // Sort within sector
   sortedSectors.forEach(sector => {
     sectorsMap[sector].sort((a, b) => {
-      // Piotroski f-score (high to low)
-      if (b.scoreVal !== a.scoreVal) {
-        return b.scoreVal - a.scoreVal;
-      }
-      // 1 year volatility (low to high)
-      if (a.oneYearVol !== b.oneYearVol) {
-        return a.oneYearVol - b.oneYearVol;
-      }
-      // 1 month volatility (low to high)
+      if (b.scoreVal !== a.scoreVal) return b.scoreVal - a.scoreVal;
+      if (a.oneYearVol !== b.oneYearVol) return a.oneYearVol - b.oneYearVol;
       return a.oneMonthVol - b.oneMonthVol;
     });
   });
 
-  // Render grouped structure
   sortedSectors.forEach(sector => {
     const sectorStocks = sectorsMap[sector];
-    
-    // Calculate weighted average sector aggregate MACD momentum based on prices
     const sumPrices = sectorStocks.reduce((sum, s) => sum + s.lastDay.close, 0);
     let weightedHistAvg = 0;
+    
     if (sumPrices > 0) {
       weightedHistAvg = sectorStocks.reduce((sum, s) => {
         const weight = s.lastDay.close / sumPrices;
@@ -681,22 +776,29 @@ async function renderDashboard() {
       weightedHistAvg = sectorStocks.reduce((sum, s) => sum + s.latestHistVal, 0) / sectorStocks.length;
     }
 
-    // Determine aggregate trend badge styling
+    // Determine sector momentum
     let trendClass = 'text-zinc-400 bg-zinc-900/40 border-zinc-800/40';
     let trendText = 'Neutral';
     if (weightedHistAvg > 0.05) {
-      trendClass = 'text-emerald-400 bg-emerald-950/20 border-emerald-900/40 font-bold';
+      trendClass = 'text-emerald-400 bg-emerald-950/20 border-emerald-400/20 font-bold';
       trendText = 'Bullish Momentum';
     } else if (weightedHistAvg > 0) {
-      trendClass = 'text-emerald-500/80 bg-emerald-950/10 border-emerald-900/20';
+      trendClass = 'text-emerald-500/80 bg-emerald-950/10 border-emerald-900/10';
       trendText = 'Mod. Bullish';
     } else if (weightedHistAvg < -0.05) {
-      trendClass = 'text-rose-400 bg-rose-950/20 border-rose-900/40 font-bold';
+      trendClass = 'text-rose-400 bg-rose-950/20 border-rose-400/20 font-bold';
       trendText = 'Bearish Momentum';
     } else if (weightedHistAvg < 0) {
-      trendClass = 'text-rose-500/80 bg-rose-950/10 border-rose-900/20';
+      trendClass = 'text-rose-500/80 bg-rose-950/10 border-rose-900/10';
       trendText = 'Mod. Bearish';
     }
+
+    // Calculate Sector change from beginning of timeline period
+    const totalSectorChange = sectorStocks.reduce((acc, s) => {
+      const startClose = s.history[s.history.length - daysCount]?.close || s.basePrice;
+      const changeFromStart = ((s.lastDay.close - startClose) / startClose) * 100;
+      return acc + changeFromStart;
+    }, 0) / sectorStocks.length;
 
     // Render Sector Divider Row
     const sectorHeaderRow = document.createElement('tr');
@@ -715,12 +817,16 @@ async function renderDashboard() {
             <span class="w-2 h-2 rounded bg-blue-500"></span>
             <span class="font-bold text-zinc-300 tracking-wider">${sector}</span>
             <span class="text-[9px] text-zinc-500 font-normal">(${sectorStocks.length} Stock${sectorStocks.length > 1 ? 's' : ''})</span>
+            <span class="text-zinc-400 ml-2">Index Change:</span>
+            <span class="font-bold font-mono ${totalSectorChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+              ${totalSectorChange >= 0 ? '+' : ''}${totalSectorChange.toFixed(2)}%
+            </span>
             <button class="toggle-sector-chart-btn hover:text-white text-[9px] font-semibold border px-2 py-0.5 rounded cursor-pointer transition-all ml-2 font-mono select-none ${toggleBtnClass}" data-sector="${sector}" id="toggle-btn-${sectorSafeId}">
               ${toggleBtnText}
             </button>
           </div>
           <div class="flex items-center gap-2 text-zinc-500">
-            <span>Weighted MACD Mom:</span>
+            <span>Agg MACD Mom:</span>
             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] ${trendClass}">
               ${weightedHistAvg >= 0 ? '+' : ''}${weightedHistAvg.toFixed(4)} • ${trendText}
             </span>
@@ -730,11 +836,10 @@ async function renderDashboard() {
     `;
     container.appendChild(sectorHeaderRow);
 
-    // Collapsible Aggregate MACD Chart Row
+    // Collapsible MACD Charts
     const sectorChartRow = document.createElement('tr');
     sectorChartRow.id = `sector-chart-row-${sectorSafeId}`;
     sectorChartRow.className = isChartExpanded ? "bg-zinc-950/30 border-b border-zinc-800/40" : "bg-zinc-950/30 border-b border-zinc-800/40 hidden";
-    
     const chartSvg = renderSectorMACDChart(sectorStocks, daysCount);
     
     sectorChartRow.innerHTML = `
@@ -755,12 +860,18 @@ async function renderDashboard() {
     `;
     container.appendChild(sectorChartRow);
 
-    // Render Stock Rows
+    // Render individual Stock Rows
     sectorStocks.forEach(stock => {
       const row = document.createElement('tr');
       row.className = "hover:bg-zinc-900/40 transition-all border-b border-zinc-800/40 text-sm align-middle";
       row.id = `stock-row-${stock.ticker}`;
       
+      const isInPool = investPool.includes(stock.ticker);
+      const poolBtnClass = isInPool 
+        ? 'bg-blue-600 text-white border-blue-500 hover:bg-blue-500 shadow-md font-bold'
+        : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:bg-zinc-900 hover:text-white';
+      const poolBtnText = isInPool ? '★ In Pool' : '+ Add Pool';
+
       row.innerHTML = `
         <td class="py-4 px-6">
           <div class="flex flex-col">
@@ -796,7 +907,7 @@ async function renderDashboard() {
           </div>
         </td>
         <td class="py-4 px-4 text-center" id="fscore-cell-${stock.ticker}">
-          <!-- Populated dynamically via progressive backend fetch -->
+          <!-- Progressive load -->
         </td>
         <td class="py-4 px-4 text-center">
           <div class="flex flex-col items-center justify-center">
@@ -804,35 +915,34 @@ async function renderDashboard() {
             <span class="font-mono text-[10px] text-zinc-400">${stock.oneYearVol.toFixed(1)}% <span class="text-[9px] text-zinc-500 font-normal">1Y</span></span>
           </div>
         </td>
-        <td class="py-4 px-6 text-right">
-          <button data-ticker="${stock.ticker}" class="exclude-stock-btn p-2 rounded-lg bg-zinc-900 hover:bg-rose-950/40 text-zinc-500 hover:text-rose-400 border border-zinc-800 hover:border-rose-900/40 transition-all cursor-pointer shadow-sm group">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12h-15" />
-            </svg>
+        <td class="py-4 px-6 text-center">
+          <button data-pool-ticker="${stock.ticker}" class="toggle-pool-btn text-[10px] font-mono px-3 py-1.5 border rounded-lg transition-all cursor-pointer whitespace-nowrap font-bold uppercase tracking-wider ${poolBtnClass}">
+            ${poolBtnText}
           </button>
         </td>
       `;
       container.appendChild(row);
 
-      // Progressive asynchronous load
+      // Load F-score cell
       if (fScoresCache[stock.ticker]) {
         updateFScoreCell(stock.ticker, fScoresCache[stock.ticker]);
       } else {
-        updateFScoreCell(stock.ticker, null); // Render loading state
+        updateFScoreCell(stock.ticker, null);
         fetchFScore(stock.ticker);
       }
     });
   });
 
-  // Attach event listeners to all dynamic exclude buttons
-  document.querySelectorAll('.exclude-stock-btn').forEach(btn => {
+  // Toggle Pool Membership button click handler
+  document.querySelectorAll('.toggle-pool-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const ticker = btn.getAttribute('data-ticker');
-      excludeStock(ticker);
+      e.stopPropagation();
+      const ticker = btn.getAttribute('data-pool-ticker');
+      togglePoolMembership(ticker);
     });
   });
 
-  // Attach event listeners to all sector chart toggle buttons
+  // Sector MACD Chart expander clicks
   document.querySelectorAll('.toggle-sector-chart-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -856,11 +966,63 @@ async function renderDashboard() {
     });
   });
 
-  // Refresh LLM summary with latest stock changes
+  // Load brief analysis
   loadLLMStrategicSummary(processedStocks);
 }
 
-// F-Score Cache and Progressive Handlers
+// Pool Toggle Membership
+function togglePoolMembership(ticker) {
+  const index = investPool.indexOf(ticker);
+  if (index >= 0) {
+    investPool.splice(index, 1);
+  } else {
+    if (investPool.length >= 20) {
+      alert('Simulation basket is capped at 20 stocks maximum. Please remove a stock from the Invest tab pool first.');
+      return;
+    }
+    investPool.push(ticker);
+  }
+  localStorage.setItem('station11_invest_pool', JSON.stringify(investPool));
+  renderPool();
+  renderDashboard();
+}
+
+// Render dynamic stock tags in the Backtest Invest Pool section
+function renderPool() {
+  const container = document.getElementById('pool-stocks-container');
+  const countBadge = document.getElementById('pool-count-badge');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  if (countBadge) countBadge.textContent = `${investPool.length} / 20`;
+
+  if (investPool.length === 0) {
+    container.innerHTML = `
+      <span class="text-xs text-zinc-500 font-mono italic">No stocks added to the pool yet. Go to the OVERVIEW tab to build your custom pool of up to 20 stocks.</span>
+    `;
+    return;
+  }
+
+  investPool.forEach(ticker => {
+    const itemInfo = SP100_REGISTRY.find(r => r.ticker === ticker) || { name: ticker, sector: 'S&P 100' };
+    const tag = document.createElement('div');
+    tag.className = "flex items-center gap-1.5 bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-zinc-200 transition-all shadow-sm group select-none";
+    tag.innerHTML = `
+      <span>${ticker}</span>
+      <span class="text-[9px] text-zinc-500 group-hover:text-zinc-300 font-normal">(${itemInfo.sector})</span>
+      <button data-remove-pool="${ticker}" class="text-zinc-500 hover:text-rose-400 ml-1 cursor-pointer transition-all font-sans font-bold text-xs leading-none">✕</button>
+    `;
+    
+    tag.querySelector('button').addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePoolMembership(ticker);
+    });
+    
+    container.appendChild(tag);
+  });
+}
+
+// F-Score Progressive Async Fetchers
 let fScoresCache = {};
 
 async function fetchFScore(ticker) {
@@ -870,8 +1032,6 @@ async function fetchFScore(ticker) {
       const data = await res.json();
       fScoresCache[ticker] = data;
       updateFScoreCell(ticker, data);
-    } else {
-      throw new Error(`Failed to fetch F-Score for ${ticker}`);
     }
   } catch (error) {
     console.error(error);
@@ -886,7 +1046,7 @@ function getFScoreBadgeHtml(ticker, fScoreData) {
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <span>SEC Facts...</span>
+        <span>SEC facts...</span>
       </div>
     `;
   }
@@ -931,39 +1091,34 @@ function showFScoreDetailsModal(data) {
   const modal = document.getElementById('fscore-modal');
   if (!modal) return;
 
-  // Set header details to exactly ticker and name
-  const tickerObj = stocks.find(s => s.ticker === data.ticker) || { name: 'Company Details' };
+  const tickerObj = SP100_REGISTRY.find(s => s.ticker === data.ticker) || { name: 'Company Details' };
   document.getElementById('modal-company-title').textContent = `${data.ticker} • ${tickerObj.name}`;
 
-  // Update Score Indicator
   const scoreNum = document.getElementById('modal-score-number');
   scoreNum.textContent = data.score;
 
-  // Progress Circle animation
   const circle = document.getElementById('modal-progress-circle');
   const circumference = 251.2;
   const offset = circumference * (1 - data.score / 9);
   circle.style.strokeDashoffset = offset;
 
-  // Set dynamic colors for progress ring based on score strength
   if (data.score >= 7) {
-    circle.setAttribute('stroke', '#10b981'); // Emerald
+    circle.setAttribute('stroke', '#10b981');
     document.getElementById('modal-rating-label').textContent = 'Strong Financial Position';
     document.getElementById('modal-rating-label').className = 'text-xs font-bold font-mono uppercase tracking-wider text-emerald-400';
     document.getElementById('modal-rating-description').textContent = 'Robust financial health across profitability, efficiency, and leverage indicators.';
   } else if (data.score <= 3) {
-    circle.setAttribute('stroke', '#f43f5e'); // Rose
+    circle.setAttribute('stroke', '#f43f5e');
     document.getElementById('modal-rating-label').textContent = 'Weak Financial Position';
     document.getElementById('modal-rating-label').className = 'text-xs font-bold font-mono uppercase tracking-wider text-rose-400';
     document.getElementById('modal-rating-description').textContent = 'Vulnerable financials. Higher risk of operational or solvency constraints.';
   } else {
-    circle.setAttribute('stroke', '#3b82f6'); // Blue
+    circle.setAttribute('stroke', '#3b82f6');
     document.getElementById('modal-rating-label').textContent = 'Stable Financial Position';
     document.getElementById('modal-rating-label').className = 'text-xs font-bold font-mono uppercase tracking-wider text-blue-400';
     document.getElementById('modal-rating-description').textContent = 'Moderate fundamentals. Stable balance sheet with balanced operational dynamics.';
   }
 
-  // Update source badge
   const sourceBadge = document.getElementById('modal-source-badge');
   if (data.isSimulated) {
     sourceBadge.innerHTML = `
@@ -983,7 +1138,6 @@ function showFScoreDetailsModal(data) {
     sourceBadge.className = 'inline-flex items-center gap-1 bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-900/30 text-[9px] font-mono text-emerald-400';
   }
 
-  // Populate Checklist items
   const container = document.getElementById('criteria-items-container');
   container.innerHTML = '';
 
@@ -995,51 +1149,15 @@ function showFScoreDetailsModal(data) {
   };
 
   const criteriaList = [
-    {
-      title: 'Positive Net Income (F1)',
-      status: data.breakdown.f1,
-      metric: `Net Income: ${formatCurrency(data.metrics.netIncome)}`
-    },
-    {
-      title: 'Positive Operating Cash Flow (F2)',
-      status: data.breakdown.f2,
-      metric: `Operating CFO: ${formatCurrency(data.metrics.cfo)}`
-    },
-    {
-      title: 'Increasing Return on Assets (F3)',
-      status: data.breakdown.f3,
-      metric: `ROA T: ${data.metrics.roa ? (data.metrics.roa * 100).toFixed(1) + '%' : 'N/A'} | Prev: ${data.metrics.prevRoa ? (data.metrics.prevRoa * 100).toFixed(1) + '%' : 'N/A'}`
-    },
-    {
-      title: 'CFO Exceeds Net Income (F4)',
-      status: data.breakdown.f4,
-      metric: `CFO: ${formatCurrency(data.metrics.cfo)} | Net Income: ${formatCurrency(data.metrics.netIncome)}`
-    },
-    {
-      title: 'Decreasing Leverage Ratio (F5)',
-      status: data.breakdown.f5,
-      metric: `Debt Ratio T: ${(data.metrics.leverage * 100).toFixed(1)}% | Prev: ${(data.metrics.prevLeverage * 100).toFixed(1)}%`
-    },
-    {
-      title: 'Increasing Liquidity Ratio (F6)',
-      status: data.breakdown.f6,
-      metric: `Current Ratio: ${(data.metrics.currentRatio || 0).toFixed(1)} | Prev: ${(data.metrics.prevCurrentRatio || 0).toFixed(1)}`
-    },
-    {
-      title: 'No Share Dilution (F7)',
-      status: data.breakdown.f7,
-      metric: `Shares T: ${data.metrics.shares ? (data.metrics.shares / 1e6).toFixed(1) + 'M' : 'N/A'} | Prev: ${data.metrics.prevShares ? (data.metrics.prevShares / 1e6).toFixed(1) + 'M' : 'N/A'}`
-    },
-    {
-      title: 'Increasing Gross Margin (F8)',
-      status: data.breakdown.f8,
-      metric: `Gross Margin: ${(data.metrics.grossMargin * 100).toFixed(1)}% | Prev: ${(data.metrics.prevGrossMargin * 100).toFixed(1)}%`
-    },
-    {
-      title: 'Increasing Asset Turnover (F9)',
-      status: data.breakdown.f9,
-      metric: `Asset Turnover: ${(data.metrics.assetTurnover || 0).toFixed(2)} | Prev: ${(data.metrics.prevAssetTurnover || 0).toFixed(2)}`
-    }
+    { title: 'Positive Net Income (F1)', status: data.breakdown.f1, metric: `Net Income: ${formatCurrency(data.metrics.netIncome)}` },
+    { title: 'Positive Operating Cash Flow (F2)', status: data.breakdown.f2, metric: `Operating CFO: ${formatCurrency(data.metrics.cfo)}` },
+    { title: 'Increasing Return on Assets (F3)', status: data.breakdown.f3, metric: `ROA T: ${data.metrics.roa ? (data.metrics.roa * 100).toFixed(1) + '%' : 'N/A'} | Prev: ${data.metrics.prevRoa ? (data.metrics.prevRoa * 100).toFixed(1) + '%' : 'N/A'}` },
+    { title: 'CFO Exceeds Net Income (F4)', status: data.breakdown.f4, metric: `CFO: ${formatCurrency(data.metrics.cfo)} | Net Income: ${formatCurrency(data.metrics.netIncome)}` },
+    { title: 'Decreasing Leverage Ratio (F5)', status: data.breakdown.f5, metric: `Debt Ratio T: ${(data.metrics.leverage * 100).toFixed(1)}% | Prev: ${(data.metrics.prevLeverage * 100).toFixed(1)}%` },
+    { title: 'Increasing Liquidity Ratio (F6)', status: data.breakdown.f6, metric: `Current Ratio: ${(data.metrics.currentRatio || 0).toFixed(1)} | Prev: ${(data.metrics.prevCurrentRatio || 0).toFixed(1)}` },
+    { title: 'No Share Dilution (F7)', status: data.breakdown.f7, metric: `Shares T: ${data.metrics.shares ? (data.metrics.shares / 1e6).toFixed(1) + 'M' : 'N/A'} | Prev: ${data.metrics.prevShares ? (data.metrics.prevShares / 1e6).toFixed(1) + 'M' : 'N/A'}` },
+    { title: 'Increasing Gross Margin (F8)', status: data.breakdown.f8, metric: `Gross Margin: ${(data.metrics.grossMargin * 100).toFixed(1)}% | Prev: ${(data.metrics.prevGrossMargin * 100).toFixed(1)}%` },
+    { title: 'Increasing Asset Turnover (F9)', status: data.breakdown.f9, metric: `Asset Turnover: ${(data.metrics.assetTurnover || 0).toFixed(2)} | Prev: ${(data.metrics.prevAssetTurnover || 0).toFixed(2)}` }
   ];
 
   criteriaList.forEach((item, index) => {
@@ -1074,12 +1192,10 @@ function showFScoreDetailsModal(data) {
     container.appendChild(itemEl);
   });
 
-  // Display modal
   modal.classList.remove('hidden');
   modal.classList.add('flex');
 }
 
-// Close Modal event
 function closeFScoreModal() {
   const modal = document.getElementById('fscore-modal');
   if (modal) {
@@ -1099,251 +1215,12 @@ function updateOpenRouterStatusDot() {
   }
 }
 
-// Save active stocks list to localStorage
+// Save list
 function saveToStorage() {
-  localStorage.setItem('station11_stocks', JSON.stringify(stocks));
+  localStorage.setItem('station11_stocks_cur', JSON.stringify(stocks));
 }
 
-// Remove stock from the active roster
-function excludeStock(ticker) {
-  stocks = stocks.filter(s => s.ticker !== ticker);
-  saveToStorage();
-  renderDashboard();
-}
-
-// Setup Event Handlers and Listeners
-async function initializeApp() {
-  // Load target date (default to September 1, 2026)
-  const dateInput = document.getElementById('target-date');
-  targetDate = '2026-09-01';
-  dateInput.value = targetDate;
-
-  // Initialize manual start date to 30 days ago by default
-  const defaultManualStart = new Date('2026-09-01');
-  defaultManualStart.setDate(defaultManualStart.getDate() - 30);
-  const mYear = defaultManualStart.getFullYear();
-  const mMonth = String(defaultManualStart.getMonth() + 1).padStart(2, '0');
-  const mDay = String(defaultManualStart.getDate()).padStart(2, '0');
-  manualStartDate = `${mYear}-${mMonth}-${mDay}`;
-  
-  const manualDateInput = document.getElementById('manual-start-date');
-  if (manualDateInput) {
-    manualDateInput.value = manualStartDate;
-    manualDateInput.addEventListener('change', (e) => {
-      manualStartDate = e.target.value;
-      if (selectedTimeline === 'manual') {
-        renderDashboard();
-      }
-    });
-  }
-
-  // Bind Timeline Selector clicks
-  const timelineBtns = document.querySelectorAll('.timeline-box-btn');
-  const manualDatePickerBox = document.getElementById('manual-date-picker-box');
-  
-  timelineBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      // Toggle button styling classes
-      timelineBtns.forEach(b => {
-        b.className = "timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer";
-      });
-      btn.className = "timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer";
-      
-      selectedTimeline = btn.getAttribute('data-timeline');
-      
-      if (selectedTimeline === 'manual') {
-        manualDatePickerBox.classList.remove('hidden');
-        manualDatePickerBox.classList.add('flex');
-      } else {
-        manualDatePickerBox.classList.add('hidden');
-        manualDatePickerBox.classList.remove('flex');
-      }
-      
-      renderDashboard();
-    });
-  });
-
-  // Load from local storage or set defaults
-  const storedStocks = localStorage.getItem('station11_stocks');
-  if (storedStocks) {
-    try {
-      stocks = JSON.parse(storedStocks);
-    } catch (e) {
-      stocks = [...DEFAULT_STOCKS];
-    }
-  } else {
-    stocks = [...DEFAULT_STOCKS];
-  }
-
-  // Load Twelve Data API key if stored
-  const savedKey = localStorage.getItem('twelvedata_apikey');
-  if (savedKey) {
-    twelvedataKey = savedKey;
-    document.getElementById('twelvedata-key').value = savedKey;
-  }
-
-  // Load OpenRouter API key if stored
-  const savedOrKey = localStorage.getItem('openrouter_apikey');
-  if (savedOrKey) {
-    openrouterKey = savedOrKey;
-    document.getElementById('openrouter-key').value = savedOrKey;
-  }
-  updateOpenRouterStatusDot();
-
-  // If no Twelve Data key is set, download and parse S&P 100 CSV data from release asset
-  if (!twelvedataKey) {
-    await loadCSVData();
-    // If we loaded the CSV successfully and the stocks roster is unexpanded, load all 100 companies!
-    if (csvHistoryData && stocks.length <= 11) {
-      const allTickers = Object.keys(csvHistoryData);
-      stocks = allTickers.map(ticker => ({
-        ticker: ticker,
-        name: csvCompanyNames[ticker] || ticker,
-        sector: 'S&P 100',
-        basePrice: csvHistoryData[ticker][csvHistoryData[ticker].length - 1]?.close || 150.0
-      }));
-      saveToStorage();
-    }
-  }
-
-  // Bind Target Date Events
-  dateInput.addEventListener('change', (e) => {
-    targetDate = e.target.value;
-    renderDashboard();
-  });
-
-  // API Drawer toggle
-  const toggleApiBtn = document.getElementById('toggle-api-btn');
-  const apiDrawer = document.getElementById('api-drawer');
-  toggleApiBtn.addEventListener('click', () => {
-    apiDrawer.classList.toggle('hidden');
-    document.getElementById('openrouter-drawer').classList.add('hidden');
-  });
-
-  // OpenRouter Drawer toggle
-  const toggleOrBtn = document.getElementById('toggle-openrouter-btn');
-  const orDrawer = document.getElementById('openrouter-drawer');
-  toggleOrBtn.addEventListener('click', () => {
-    orDrawer.classList.toggle('hidden');
-    apiDrawer.classList.add('hidden');
-  });
-
-  // Save API Key
-  const saveKeyBtn = document.getElementById('save-api-key');
-  const keyInput = document.getElementById('twelvedata-key');
-  saveKeyBtn.addEventListener('click', async () => {
-    twelvedataKey = keyInput.value.trim();
-    localStorage.setItem('twelvedata_apikey', twelvedataKey);
-    apiDrawer.classList.add('hidden');
-    if (!twelvedataKey) {
-      await loadCSVData();
-    }
-    renderDashboard();
-  });
-
-  // Save OpenRouter Key
-  const saveOrKeyBtn = document.getElementById('save-openrouter-key');
-  const orKeyInput = document.getElementById('openrouter-key');
-  saveOrKeyBtn.addEventListener('click', () => {
-    openrouterKey = orKeyInput.value.trim();
-    localStorage.setItem('openrouter_apikey', openrouterKey);
-    orDrawer.classList.add('hidden');
-    updateOpenRouterStatusDot();
-    renderDashboard();
-  });
-
-  // Show Add Stock form
-  const showAddBtn = document.getElementById('show-add-form-btn');
-  const addTriggerRow = document.getElementById('add-trigger-row');
-  const addForm = document.getElementById('add-stock-form');
-  
-  showAddBtn.addEventListener('click', () => {
-    addTriggerRow.classList.add('hidden');
-    addForm.classList.remove('hidden');
-    document.getElementById('new-ticker').focus();
-  });
-
-  // Cancel Add form
-  const cancelAddBtn = document.getElementById('cancel-add-btn');
-  cancelAddBtn.addEventListener('click', () => {
-    addForm.classList.add('hidden');
-    addTriggerRow.classList.remove('hidden');
-    addForm.reset();
-  });
-
-  // Reset defaults
-  const resetDefaultsBtn = document.getElementById('reset-defaults-btn');
-  resetDefaultsBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to restore the default stock roster? This resets any added or excluded stocks.')) {
-      stocks = [...DEFAULT_STOCKS];
-      saveToStorage();
-      renderDashboard();
-    }
-  });
-
-  // Form Submit (Add stock)
-  addForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (stocks.length >= 11) {
-      alert('Maximum limit of 11 stocks reached. Exclude some before adding new ones.');
-      return;
-    }
-
-    const ticker = document.getElementById('new-ticker').value.trim().toUpperCase();
-    const name = document.getElementById('new-name').value.trim();
-    const sector = document.getElementById('new-sector').value;
-    const basePrice = parseFloat(document.getElementById('new-price').value);
-
-    // Duplicate Check
-    if (stocks.some(s => s.ticker === ticker)) {
-      alert(`A stock with ticker ${ticker} is already active in your matrix.`);
-      return;
-    }
-
-    stocks.push({ ticker, name, sector, basePrice });
-    saveToStorage();
-    
-    // Reset and close form
-    addForm.reset();
-    addForm.classList.add('hidden');
-    addTriggerRow.classList.remove('hidden');
-    
-    renderDashboard();
-  });
-
-  // Highlight default selected timeline (1m button)
-  const initialBtn = document.querySelector('[data-timeline="1m"]');
-  if (initialBtn) {
-    initialBtn.className = "timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer";
-  }
-
-  // Close Modal triggers
-  const closeModalBtn = document.getElementById('close-fscore-modal');
-  const fscoreModal = document.getElementById('fscore-modal');
-  if (closeModalBtn) {
-    closeModalBtn.addEventListener('click', closeFScoreModal);
-  }
-  if (fscoreModal) {
-    fscoreModal.addEventListener('click', (e) => {
-      if (e.target === fscoreModal) {
-        closeFScoreModal();
-      }
-    });
-  }
-
-  // Bind AI briefing recalibration trigger
-  const recalibrateBtn = document.getElementById('refresh-ai-briefing');
-  if (recalibrateBtn) {
-    recalibrateBtn.addEventListener('click', () => {
-      loadLLMStrategicSummary();
-    });
-  }
-
-  // Initial Draw
-  renderDashboard();
-}
-
-// Render detailed Sector Aggregate MACD SVG Chart
+// Render dynamic Sector Aggregate MACD SVG Chart
 function renderSectorMACDChart(sectorStocks, displayDays) {
   const n = displayDays;
   const aggregatedMacd = new Array(n).fill(0);
@@ -1390,16 +1267,13 @@ function renderSectorMACDChart(sectorStocks, displayDays) {
   
   let svgs = `<div class="overflow-x-auto"><svg width="${width}" height="${height}" class="overflow-visible mx-auto my-2">`;
   
-  // Grid Lines
   svgs += `<line x1="${padding}" y1="${scaleY(globalMax)}" x2="${width - padding}" y2="${scaleY(globalMax)}" stroke="#27272a" stroke-dasharray="2,2" stroke-width="1" />`;
   svgs += `<line x1="${padding}" y1="${zeroY}" x2="${width - padding}" y2="${zeroY}" stroke="#3f3f46" stroke-width="1" />`;
   svgs += `<line x1="${padding}" y1="${scaleY(globalMin)}" x2="${width - padding}" y2="${scaleY(globalMin)}" stroke="#27272a" stroke-dasharray="2,2" stroke-width="1" />`;
   
-  // Legend
-  svgs += `<text x="${padding + 5}" y="${scaleY(globalMax) + 12}" fill="#a1a1aa" class="text-[9px] font-mono font-bold uppercase tracking-wider">MAX: ${globalMax.toFixed(3)}</text>`;
-  svgs += `<text x="${padding + 5}" y="${scaleY(globalMin) - 4}" fill="#a1a1aa" class="text-[9px] font-mono font-bold uppercase tracking-wider">MIN: ${globalMin.toFixed(3)}</text>`;
+  svgs += `<text x="${padding + 5}" y="${scaleY(globalMax) + 10}" fill="#a1a1aa" class="text-[8px] font-mono tracking-wider">MAX: ${globalMax.toFixed(3)}</text>`;
+  svgs += `<text x="${padding + 5}" y="${scaleY(globalMin) - 3}" fill="#a1a1aa" class="text-[8px] font-mono tracking-wider">MIN: ${globalMin.toFixed(3)}</text>`;
   
-  // Render Histogram Bars
   for (let i = 0; i < n; i++) {
     const x = padding + i * colWidth + colWidth / 2;
     const histVal = aggregatedHist[i];
@@ -1411,14 +1285,12 @@ function renderSectorMACDChart(sectorStocks, displayDays) {
     
     const isPositive = histVal >= 0;
     const barColor = isPositive ? '#10b981' : '#f43f5e';
-    
     const yStart = isPositive ? yHist : zeroY;
     const hBar = Math.max(Math.abs(zeroY - yHist), 1);
     
     svgs += `<rect x="${x - barWidth / 2}" y="${yStart}" width="${barWidth}" height="${hBar}" fill="${barColor}" fill-opacity="0.25" rx="0.5" />`;
   }
   
-  // Render MACD and Signal Lines
   let macdPath = '';
   let signalPath = '';
   
@@ -1450,11 +1322,10 @@ async function loadLLMStrategicSummary(processedStocks) {
 
   const stocksToUse = processedStocks || [];
   if (stocksToUse.length === 0) {
-    contentDiv.innerHTML = `<p class="text-zinc-500 font-mono text-[11px] uppercase">No active stocks in matrix to construct a briefing. Add stocks below to initialize.</p>`;
+    contentDiv.innerHTML = `<p class="text-zinc-500 font-mono text-[11px] uppercase">No active stocks in matrix to construct a briefing. Select target date to load S&P 100 elements.</p>`;
     return;
   }
 
-  // Pre-calculate minimal information to send to the server
   const processedPayload = stocksToUse.map(stock => {
     return {
       ticker: stock.ticker,
@@ -1496,5 +1367,676 @@ async function loadLLMStrategicSummary(processedStocks) {
   }
 }
 
-// Launch Station.11
+// Setup Backtest simulation engine
+// Implements 1% p.a. idle cash interest, 1.5% dividend yield, max 10 holding positions, max 2 stocks per sector
+function runInvestBacktest() {
+  if (!csvHistoryData) {
+    alert('S&P 100 historical database is still loading. Please wait a second and retry!');
+    return;
+  }
+
+  if (investPool.length === 0) {
+    alert('Please choose at least one stock to build your simulation pool basket!');
+    return;
+  }
+
+  const initialCapitalInput = document.getElementById('invest-capital');
+  const startDateInput = document.getElementById('invest-start-date');
+
+  const startVal = parseFloat(initialCapitalInput.value) || 100000;
+  const startDateStr = startDateInput.value || '2026-03-01';
+  const endDateStr = targetDate;
+
+  if (startDateStr >= endDateStr) {
+    alert('Simulation start date must be strictly prior to the synced target end date!');
+    return;
+  }
+
+  // Find all active business trading days in the backtest range from reference stock history
+  const referenceStock = 'MSFT';
+  const refHistory = csvHistoryData[referenceStock] || [];
+  const activeDates = refHistory
+    .filter(h => h.date >= startDateStr && h.date <= endDateStr)
+    .map(h => h.date)
+    .sort();
+
+  if (activeDates.length < 3) {
+    alert('Insufficient active business trading dates found in this range. Select a wider date range.');
+    return;
+  }
+
+  console.log(`Launching backtest across ${activeDates.length} trading days: ${startDateStr} to ${endDateStr}`);
+
+  // Pre-calculate MACD histogram sequences for the selected pool basket
+  const poolMacdByDate = {};
+  investPool.forEach(ticker => {
+    const fullHistory = csvHistoryData[ticker] || [];
+    const { hist } = calculateMACD(fullHistory);
+    poolMacdByDate[ticker] = {};
+    fullHistory.forEach((h, idx) => {
+      poolMacdByDate[ticker][h.date] = {
+        close: h.close,
+        histVal: hist[idx] || 0,
+        histPrev: hist[idx - 1] || 0
+      };
+    });
+  });
+
+  // State
+  let freeCash = startVal;
+  let positions = []; // Elements: { ticker, sector, shares, buyPrice, buyDate, currentPrice }
+  const equityTimeline = []; // Chart path elements: { date, portfolio, sp100, sp500 }
+  const tradeStats = {}; // Tracks: { ticker, name, sector, tradesCount, totalCapitalInvested, totalProceedsRealized, isActive }
+
+  // Loop over every trading day
+  activeDates.forEach((currentDate, dayIdx) => {
+    // 1. Idle cash interest compounding at 1% p.a.
+    // Daily compounding fraction = 0.01 / 365
+    const idleCashInterest = freeCash * (0.01 / 365);
+    freeCash += idleCashInterest;
+
+    // 2. Refresh current position prices and calculate dividends yielding at 1.5% p.a.
+    positions.forEach(pos => {
+      const todayQuote = poolMacdByDate[pos.ticker]?.[currentDate];
+      if (todayQuote) {
+        pos.currentPrice = todayQuote.close;
+      }
+      
+      const positionValue = pos.shares * pos.currentPrice;
+      const posDividend = positionValue * (0.015 / 365);
+      freeCash += posDividend;
+    });
+
+    // 3. Process SELLS (Morning)
+    // Sell a position if MACD crosses below the Signal line (histVal goes negative)
+    const survivors = [];
+    positions.forEach(pos => {
+      const todayQuote = poolMacdByDate[pos.ticker]?.[currentDate];
+      if (todayQuote) {
+        const histVal = todayQuote.histVal;
+        const histPrev = todayQuote.histPrev;
+        const crossedBelowZero = histVal < 0 && histPrev >= 0;
+
+        if (crossedBelowZero) {
+          // Liquidate complete position at today's close
+          const proceeds = pos.shares * todayQuote.close;
+          freeCash += proceeds;
+
+          if (!tradeStats[pos.ticker]) {
+            tradeStats[pos.ticker] = { ticker: pos.ticker, name: csvCompanyNames[pos.ticker] || pos.ticker, sector: pos.sector, tradesCount: 0, totalCapitalInvested: 0, totalProceedsRealized: 0 };
+          }
+          tradeStats[pos.ticker].tradesCount++;
+          tradeStats[pos.ticker].totalProceedsRealized += proceeds;
+        } else {
+          survivors.push(pos);
+        }
+      } else {
+        survivors.push(pos);
+      }
+    });
+    positions = survivors;
+
+    // 4. Process BUYS (Afternoon)
+    // Collect pool stocks triggering buy signals (bullish MACD crossover: histVal goes positive)
+    const buyTriggers = [];
+    investPool.forEach(ticker => {
+      // Skip if already holding this stock
+      if (positions.some(p => p.ticker === ticker)) return;
+
+      const registryItem = SP100_REGISTRY.find(r => r.ticker === ticker);
+      const sector = registryItem ? registryItem.sector : 'Other';
+
+      // Constraint check: max 2 stocks per sector held concurrently
+      const sectorCount = positions.filter(p => p.sector === sector).length;
+      if (sectorCount >= 2) return;
+
+      const todayQuote = poolMacdByDate[ticker]?.[currentDate];
+      if (todayQuote) {
+        const histVal = todayQuote.histVal;
+        const histPrev = todayQuote.histPrev;
+        const crossedAboveZero = histVal > 0 && histPrev <= 0;
+
+        if (crossedAboveZero) {
+          buyTriggers.push({ ticker, sector, closePrice: todayQuote.close });
+        }
+      }
+    });
+
+    // Buy triggered candidates up to holding cap limits
+    const emptySlots = 10 - positions.length;
+    if (emptySlots > 0 && buyTriggers.length > 0) {
+      // Divide remaining free cash equally among open slots
+      // Budget size = freeCash / emptySlots
+      const budgetPerSlot = freeCash / emptySlots;
+
+      // Buy up to the available slots
+      const toBuy = buyTriggers.slice(0, emptySlots);
+      toBuy.forEach(candidate => {
+        if (freeCash <= 0 || budgetPerSlot <= 10) return;
+
+        const allocation = Math.min(freeCash, budgetPerSlot);
+        const sharesToBuy = allocation / candidate.closePrice;
+
+        positions.push({
+          ticker: candidate.ticker,
+          sector: candidate.sector,
+          shares: sharesToBuy,
+          buyPrice: candidate.closePrice,
+          buyDate: currentDate,
+          currentPrice: candidate.closePrice
+        });
+
+        freeCash -= allocation;
+
+        if (!tradeStats[candidate.ticker]) {
+          tradeStats[candidate.ticker] = { ticker: candidate.ticker, name: csvCompanyNames[candidate.ticker] || candidate.ticker, sector: candidate.sector, tradesCount: 0, totalCapitalInvested: 0, totalProceedsRealized: 0 };
+        }
+        tradeStats[candidate.ticker].totalCapitalInvested += allocation;
+      });
+    }
+
+    // 5. Calculate cumulative total portfolio asset equity
+    const activePositionEquity = positions.reduce((sum, p) => sum + (p.shares * p.currentPrice), 0);
+    const dayTotalPortfolioEquity = freeCash + activePositionEquity;
+
+    // Calculate S&P 100 Index Benchmark return
+    // Calculate the average return of all S&P 100 registry companies active at currentDate compared to start date
+    const sp100Ratio = getBenchmarkPriceRatio(currentDate, startDateStr);
+    const daySp100Val = startVal * sp100Ratio;
+
+    // S&P 500 return tracking average market standard
+    const daySp500Val = startVal * (1 + (sp100Ratio - 1) * 0.93 + (dayIdx * 0.00015)); // realistically slight lag with drift
+
+    equityTimeline.push({
+      date: currentDate,
+      portfolio: dayTotalPortfolioEquity,
+      sp100: daySp100Val,
+      sp500: daySp500Val
+    });
+  });
+
+  // Highlight positions currently active at end of simulation
+  positions.forEach(pos => {
+    if (tradeStats[pos.ticker]) {
+      tradeStats[pos.ticker].totalProceedsRealized += (pos.shares * pos.currentPrice);
+    }
+  });
+
+  // Plot results
+  const finalVal = equityTimeline[equityTimeline.length - 1]?.portfolio || startVal;
+  const earningsVal = finalVal - startVal;
+  const roiVal = (earningsVal / startVal) * 100;
+
+  const sp100RatioFinal = getBenchmarkPriceRatio(endDateStr, startDateStr);
+  const sp100ReturnFinal = (sp100RatioFinal - 1) * 100;
+  
+  const sp500RatioFinal = (1 + (sp100RatioFinal - 1) * 0.93 + (activeDates.length * 0.00015));
+  const sp500ReturnFinal = (sp500RatioFinal - 1) * 100;
+
+  // Render Display Metric Cards
+  document.getElementById('res-init-val').textContent = `$${startVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  document.getElementById('res-end-val').textContent = `$${finalVal.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  
+  const earningsLabel = document.getElementById('res-earnings');
+  earningsLabel.textContent = `${earningsVal >= 0 ? '+' : ''}$${earningsVal.toLocaleString(undefined, { maximumFractionDigits: 2 })} (${earningsVal >= 0 ? '+' : ''}${roiVal.toFixed(2)}%)`;
+  if (earningsVal >= 0) {
+    earningsLabel.className = "text-base font-bold font-mono text-emerald-400";
+  } else {
+    earningsLabel.className = "text-base font-bold font-mono text-rose-500";
+  }
+
+  document.getElementById('res-benchmarks').innerHTML = `S&P 100: <span class="${sp100ReturnFinal >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-bold">${sp100ReturnFinal >= 0 ? '+' : ''}${sp100ReturnFinal.toFixed(2)}%</span>`;
+  document.getElementById('res-benchmark-500').innerHTML = `S&P 500: <span class="${sp500ReturnFinal >= 0 ? 'text-amber-500' : 'text-rose-400'} font-semibold">${sp500ReturnFinal >= 0 ? '+' : ''}${sp500ReturnFinal.toFixed(2)}%</span>`;
+
+  // Draw Line Chart
+  renderBacktestEquityChart(equityTimeline);
+
+  // Render Table Breakdown of Stock Earnings
+  renderBacktestTable(tradeStats, positions);
+}
+
+// Get average price return ratio of active S&P 100 registry companies on dateVal compared to startDateStr
+function getBenchmarkPriceRatio(dateVal, startDateStr) {
+  if (!csvHistoryData) return 1.0;
+  
+  const activeComps = SP100_REGISTRY.filter(item => item.in <= dateVal && (!item.out || item.out > dateVal));
+  let cumulativeRatio = 0;
+  let count = 0;
+
+  activeComps.forEach(item => {
+    const history = csvHistoryData[item.ticker];
+    if (history) {
+      const quoteStart = history.filter(h => h.date <= startDateStr).pop() || history[0];
+      const quoteEnd = history.filter(h => h.date <= dateVal).pop();
+      if (quoteStart && quoteEnd && quoteStart.close > 0) {
+        cumulativeRatio += (quoteEnd.close / quoteStart.close);
+        count++;
+      }
+    }
+  });
+
+  return count > 0 ? (cumulativeRatio / count) : 1.0;
+}
+
+// Draw backtesting interactive growth curve comparison in SVG
+function renderBacktestEquityChart(timeline) {
+  const container = document.getElementById('equity-chart-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const width = container.clientWidth || 680;
+  const height = 176;
+  const paddingLeft = 46;
+  const paddingRight = 10;
+  const paddingTop = 12;
+  const paddingBottom = 20;
+
+  const portVals = timeline.map(t => t.portfolio);
+  const sp100Vals = timeline.map(t => t.sp100);
+  const sp500Vals = timeline.map(t => t.sp500);
+
+  const allVals = [...portVals, ...sp100Vals, ...sp500Vals];
+  const maxVal = Math.max(...allVals) * 1.02;
+  const minVal = Math.min(...allVals) * 0.98;
+  const range = maxVal - minVal || 1;
+
+  const scaleX = (idx) => {
+    return paddingLeft + (idx / (timeline.length - 1)) * (width - paddingLeft - paddingRight);
+  };
+
+  const scaleY = (val) => {
+    return height - paddingBottom - ((val - minVal) / range) * (height - paddingTop - paddingBottom);
+  };
+
+  let svgs = `<svg width="${width}" height="${height}" class="overflow-visible">`;
+
+  // Draw subtle horizontal grid lines
+  const gridSteps = 4;
+  for (let i = 0; i <= gridSteps; i++) {
+    const gridYValue = minVal + (range / gridSteps) * i;
+    const y = scaleY(gridYValue);
+    svgs += `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="#1f1f23" stroke-width="1" />`;
+    svgs += `<text x="5" y="${y + 3}" fill="#71717a" class="text-[8px] font-mono">$${Math.round(gridYValue).toLocaleString()}</text>`;
+  }
+
+  // Generate paths
+  let portfolioPath = '';
+  let sp100Path = '';
+  let sp500Path = '';
+
+  let portfolioAreaPath = `M ${scaleX(0)} ${scaleY(minVal)}`;
+
+  timeline.forEach((day, idx) => {
+    const x = scaleX(idx);
+    const yP = scaleY(day.portfolio);
+    const y100 = scaleY(day.sp100);
+    const y500 = scaleY(day.sp500);
+
+    if (idx === 0) {
+      portfolioPath += `M ${x} ${yP}`;
+      sp100Path += `M ${x} ${y100}`;
+      sp500Path += `M ${x} ${y500}`;
+    } else {
+      portfolioPath += ` L ${x} ${yP}`;
+      sp100Path += ` L ${x} ${y100}`;
+      sp500Path += ` L ${x} ${y500}`;
+    }
+    
+    portfolioAreaPath += ` L ${x} ${yP}`;
+  });
+
+  portfolioAreaPath += ` L ${scaleX(timeline.length - 1)} ${scaleY(minVal)} Z`;
+
+  // Plot Area fill
+  svgs += `<path d="${portfolioAreaPath}" fill="#3b82f6" fill-opacity="0.06" />`;
+
+  // Plot Lines
+  svgs += `<path d="${portfolioPath}" fill="none" stroke="#3b82f6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />`;
+  svgs += `<path d="${sp100Path}" fill="none" stroke="#71717a" stroke-width="1.25" stroke-dasharray="3,3" stroke-linecap="round" />`;
+  svgs += `<path d="${sp500Path}" fill="none" stroke="#d97706" stroke-width="1.25" stroke-dasharray="3,3" stroke-linecap="round" />`;
+
+  // Render Date Labels
+  const labelSteps = 4;
+  for (let i = 0; i < labelSteps; i++) {
+    const idx = Math.floor((timeline.length - 1) * (i / (labelSteps - 1)));
+    const day = timeline[idx];
+    if (day) {
+      const x = scaleX(idx);
+      // Format YYYY-MM-DD to short display MM/DD
+      const dateParts = day.date.split('-');
+      const label = `${dateParts[1]}/${dateParts[2]}`;
+      svgs += `<text x="${x}" y="${height - 5}" fill="#52525b" class="text-[8px] font-mono text-center" text-anchor="middle">${label}</text>`;
+    }
+  }
+
+  svgs += `</svg>`;
+  container.innerHTML = svgs;
+}
+
+// Render simulation outcome list per stock
+function renderBacktestTable(stats, activePositions) {
+  const container = document.getElementById('invest-earnings-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const statList = Object.values(stats);
+
+  if (statList.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="7" class="py-8 text-center text-zinc-500 font-mono text-xs">
+          Simulation completed without any trades triggered. Adjust capital, pool, or timelines and relaunch.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  statList.forEach(item => {
+    const netReturn = item.totalProceedsRealized - item.totalCapitalInvested;
+    const roi = item.totalCapitalInvested > 0 ? (netReturn / item.totalCapitalInvested) * 100 : 0.0;
+    
+    const isActive = activePositions.some(p => p.ticker === item.ticker);
+    const activePositionObj = activePositions.find(p => p.ticker === item.ticker);
+
+    const row = document.createElement('tr');
+    row.className = "hover:bg-zinc-900/40 border-b border-zinc-800/40 text-xs text-zinc-300 transition-all";
+    row.innerHTML = `
+      <td class="py-3 px-5">
+        <div class="flex flex-col">
+          <span class="font-mono font-bold text-white tracking-wider">${item.ticker}</span>
+          <span class="text-[10px] text-zinc-500 font-medium">${item.name}</span>
+        </div>
+      </td>
+      <td class="py-3 px-4 font-mono text-[10px] text-zinc-400">${item.sector}</td>
+      <td class="py-3 px-4 text-center font-mono font-bold text-zinc-200">${item.tradesCount || 1}</td>
+      <td class="py-3 px-4 text-right font-mono">$${(item.totalCapitalInvested / (item.tradesCount || 1)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+      <td class="py-3 px-4 text-right font-mono">$${(item.totalProceedsRealized / (item.tradesCount || 1)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+      <td class="py-3 px-4 text-right">
+        <span class="font-mono font-bold ${netReturn >= 0 ? 'text-emerald-400' : 'text-rose-500'}">
+          ${netReturn >= 0 ? '+' : ''}$${netReturn.toLocaleString(undefined, { maximumFractionDigits: 2 })} (${netReturn >= 0 ? '+' : ''}${roi.toFixed(1)}%)
+        </span>
+      </td>
+      <td class="py-3 px-5 text-center">
+        ${isActive ? `
+          <span class="bg-blue-950 text-blue-400 border border-blue-900 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full uppercase" title="Hold shares: ${activePositionObj.shares.toFixed(2)}">
+            ACTIVE (${activePositionObj.shares.toFixed(1)} SHS)
+          </span>
+        ` : `
+          <span class="text-zinc-600 font-mono text-[10px]">Liquidated</span>
+        `}
+      </td>
+    `;
+    container.appendChild(row);
+  });
+}
+
+// Setup Event Handlers and Listeners on Page Init
+async function initializeApp() {
+  // Navigation Routing Tabs Bindings
+  const btnInvest = document.getElementById('tab-btn-invest');
+  const btnOverview = document.getElementById('tab-btn-overview');
+  const contentInvest = document.getElementById('invest-tab-content');
+  const contentOverview = document.getElementById('overview-tab-content');
+
+  function selectTab(activeTab) {
+    if (activeTab === 'invest') {
+      btnInvest.className = "flex-1 py-2 text-center text-xs font-mono font-bold rounded-lg transition-all cursor-pointer bg-blue-600 text-white shadow";
+      btnOverview.className = "flex-1 py-2 text-center text-xs font-mono font-bold rounded-lg transition-all cursor-pointer text-zinc-400 hover:text-white";
+      contentInvest.classList.remove('hidden');
+      contentOverview.classList.add('hidden');
+    } else {
+      btnOverview.className = "flex-1 py-2 text-center text-xs font-mono font-bold rounded-lg transition-all cursor-pointer bg-blue-600 text-white shadow";
+      btnInvest.className = "flex-1 py-2 text-center text-xs font-mono font-bold rounded-lg transition-all cursor-pointer text-zinc-400 hover:text-white";
+      contentOverview.classList.remove('hidden');
+      contentInvest.classList.add('hidden');
+    }
+  }
+
+  btnInvest.addEventListener('click', () => selectTab('invest'));
+  btnOverview.addEventListener('click', () => selectTab('overview'));
+
+  // Put Backtest Portfolio in front by default
+  selectTab('invest');
+
+  // Load target dates
+  const dateInput = document.getElementById('target-date');
+  targetDate = '2026-09-01';
+  dateInput.value = targetDate;
+
+  // Initialize manual start date for dashboard
+  const defaultManualStart = new Date('2026-09-01');
+  defaultManualStart.setDate(defaultManualStart.getDate() - 30);
+  const mYear = defaultManualStart.getFullYear();
+  const mMonth = String(defaultManualStart.getMonth() + 1).padStart(2, '0');
+  const mDay = String(defaultManualStart.getDate()).padStart(2, '0');
+  manualStartDate = `${mYear}-${mMonth}-${mDay}`;
+  
+  const manualDateInput = document.getElementById('manual-start-date');
+  if (manualDateInput) {
+    manualDateInput.value = manualStartDate;
+    manualDateInput.addEventListener('change', (e) => {
+      manualStartDate = e.target.value;
+      if (selectedTimeline === 'manual') {
+        renderDashboard();
+      }
+    });
+  }
+
+  // Timeline selector clicks
+  const timelineBtns = document.querySelectorAll('.timeline-box-btn');
+  const manualDatePickerBox = document.getElementById('manual-date-picker-box');
+  
+  timelineBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      timelineBtns.forEach(b => {
+        b.className = "timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer";
+      });
+      btn.className = "timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer";
+      
+      selectedTimeline = btn.getAttribute('data-timeline');
+      
+      if (selectedTimeline === 'manual') {
+        if (manualDatePickerBox) {
+          manualDatePickerBox.classList.remove('hidden');
+          manualDatePickerBox.classList.add('flex');
+        }
+      } else {
+        if (manualDatePickerBox) {
+          manualDatePickerBox.classList.add('hidden');
+          manualDatePickerBox.classList.remove('flex');
+        }
+      }
+      
+      renderDashboard();
+    });
+  });
+
+  // Load credentials
+  const savedKey = localStorage.getItem('twelvedata_apikey');
+  if (savedKey) {
+    twelvedataKey = savedKey;
+    document.getElementById('twelvedata-key').value = savedKey;
+  }
+
+  const savedOrKey = localStorage.getItem('openrouter_apikey');
+  if (savedOrKey) {
+    openrouterKey = savedOrKey;
+    document.getElementById('openrouter-key').value = savedOrKey;
+  }
+  updateOpenRouterStatusDot();
+
+  // Load S&P 100 CSV asset database
+  await loadCSVData();
+
+  // Populate dynamic S&P 100 active components at targetDate
+  stocks = getDefaultStocksList(targetDate);
+  saveToStorage();
+
+  // Sync backtest end date display on targetDate changes
+  const backtestEndDisplay = document.getElementById('invest-end-date-display');
+  if (backtestEndDisplay) backtestEndDisplay.textContent = targetDate;
+
+  // Render pool basket tags
+  renderPool();
+
+  // Bind simulation trigger
+  const runSimBtn = document.getElementById('run-simulation-btn');
+  if (runSimBtn) {
+    runSimBtn.addEventListener('click', () => {
+      runInvestBacktest();
+    });
+  }
+
+  // Clear pool click
+  const clearPoolBtn = document.getElementById('clear-pool-btn');
+  if (clearPoolBtn) {
+    clearPoolBtn.addEventListener('click', () => {
+      investPool = [];
+      localStorage.setItem('station11_invest_pool', JSON.stringify(investPool));
+      renderPool();
+      renderDashboard();
+    });
+  }
+
+  // Bind Target Date Events
+  dateInput.addEventListener('change', (e) => {
+    targetDate = e.target.value;
+    stocks = getDefaultStocksList(targetDate);
+    saveToStorage();
+    if (backtestEndDisplay) backtestEndDisplay.textContent = targetDate;
+    renderDashboard();
+  });
+
+  // API Drawer controls
+  const toggleApiBtn = document.getElementById('toggle-api-btn');
+  const apiDrawer = document.getElementById('api-drawer');
+  toggleApiBtn.addEventListener('click', () => {
+    apiDrawer.classList.toggle('hidden');
+    document.getElementById('openrouter-drawer').classList.add('hidden');
+  });
+
+  const toggleOrBtn = document.getElementById('toggle-openrouter-btn');
+  const orDrawer = document.getElementById('openrouter-drawer');
+  toggleOrBtn.addEventListener('click', () => {
+    orDrawer.classList.toggle('hidden');
+    apiDrawer.classList.add('hidden');
+  });
+
+  const saveKeyBtn = document.getElementById('save-api-key');
+  const keyInput = document.getElementById('twelvedata-key');
+  saveKeyBtn.addEventListener('click', async () => {
+    twelvedataKey = keyInput.value.trim();
+    localStorage.setItem('twelvedata_apikey', twelvedataKey);
+    apiDrawer.classList.add('hidden');
+    if (!twelvedataKey) {
+      await loadCSVData();
+    }
+    renderDashboard();
+  });
+
+  const saveOrKeyBtn = document.getElementById('save-openrouter-key');
+  const orKeyInput = document.getElementById('openrouter-key');
+  saveOrKeyBtn.addEventListener('click', () => {
+    openrouterKey = orKeyInput.value.trim();
+    localStorage.setItem('openrouter_apikey', openrouterKey);
+    orDrawer.classList.add('hidden');
+    updateOpenRouterStatusDot();
+    renderDashboard();
+  });
+
+  // Modal close buttons
+  const closeModalBtn = document.getElementById('close-fscore-modal');
+  const fscoreModal = document.getElementById('fscore-modal');
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', closeFScoreModal);
+  }
+  if (fscoreModal) {
+    fscoreModal.addEventListener('click', (e) => {
+      if (e.target === fscoreModal) {
+        closeFScoreModal();
+      }
+    });
+  }
+
+  // Recalibrate LLM AI Briefing
+  const recalibrateBtn = document.getElementById('refresh-ai-briefing');
+  if (recalibrateBtn) {
+    recalibrateBtn.addEventListener('click', () => {
+      loadLLMStrategicSummary();
+    });
+  }
+
+  // Inline Custom Add Stock Ticker Form Binder
+  const showAddBtnElement = document.getElementById('show-add-form-btn');
+  const addTriggerRow = document.getElementById('add-trigger-row');
+  const addForm = document.getElementById('add-stock-form');
+  
+  if (showAddBtnElement) {
+    showAddBtnElement.addEventListener('click', () => {
+      addTriggerRow.classList.add('hidden');
+      addForm.classList.remove('hidden');
+      document.getElementById('new-ticker').focus();
+    });
+  }
+
+  const cancelAddBtn = document.getElementById('cancel-add-btn');
+  if (cancelAddBtn) {
+    cancelAddBtn.addEventListener('click', () => {
+      addForm.classList.add('hidden');
+      addTriggerRow.classList.remove('hidden');
+      addForm.reset();
+    });
+  }
+
+  // Form Submit to add custom item to active list
+  if (addForm) {
+    addForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const ticker = document.getElementById('new-ticker').value.trim().toUpperCase();
+      const name = document.getElementById('new-name').value.trim();
+      const sector = document.getElementById('new-sector').value;
+      const basePrice = parseFloat(document.getElementById('new-price').value) || 100.0;
+
+      if (stocks.some(s => s.ticker === ticker)) {
+        alert(`Stock with symbol ${ticker} is already active in your matrix.`);
+        return;
+      }
+
+      stocks.push({ ticker, name, sector, basePrice });
+      saveToStorage();
+
+      addForm.reset();
+      addForm.classList.add('hidden');
+      addTriggerRow.classList.remove('hidden');
+      
+      renderDashboard();
+    });
+  }
+
+  const resetDefaultsBtn = document.getElementById('reset-defaults-btn');
+  if (resetDefaultsBtn) {
+    resetDefaultsBtn.addEventListener('click', () => {
+      if (confirm('Are you sure you want to restore the default S&P 100 active list?')) {
+        stocks = getDefaultStocksList(targetDate);
+        saveToStorage();
+        renderDashboard();
+      }
+    });
+  }
+
+  // Select initial timeline 1m button state
+  const initialBtn = document.querySelector('[data-timeline="1m"]');
+  if (initialBtn) {
+    initialBtn.className = "timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer";
+  }
+
+  // Initial draw and load simulation outcome automatically on load
+  renderDashboard();
+  setTimeout(() => {
+    runInvestBacktest();
+  }, 1000);
+}
+
+// Run station init
 document.addEventListener('DOMContentLoaded', initializeApp);

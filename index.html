@@ -56,6 +56,16 @@
       </div>
     </header>
 
+    <!-- Navigation Tabs Bar -->
+    <div class="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 mb-6 max-w-sm self-start">
+      <button id="tab-btn-invest" class="flex-1 py-2 text-center text-xs font-mono font-bold rounded-lg transition-all cursor-pointer bg-blue-600 text-white shadow">
+        INVEST PORTFOLIO
+      </button>
+      <button id="tab-btn-overview" class="flex-1 py-2 text-center text-xs font-mono font-bold rounded-lg transition-all cursor-pointer text-zinc-400 hover:text-white">
+        OVERVIEW
+      </button>
+    </div>
+
     <!-- Twelve Data API Drawer (Collapsible) -->
     <section id="api-drawer" class="hidden mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-4 transition-all">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -91,6 +101,159 @@
         </div>
       </div>
     </section>
+
+    <!-- Tab 1: Invest Portfolio Screen (Visible by Default) -->
+    <section id="invest-tab-content" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Simulation Settings & Pool Configuration Left Panel -->
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-5 flex flex-col justify-between">
+          <div class="space-y-4">
+            <div class="flex items-center gap-2 border-b border-zinc-800 pb-3">
+              <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
+              </svg>
+              <h3 class="text-sm font-semibold font-mono text-white uppercase tracking-wider">Simulation Parameters</h3>
+            </div>
+
+            <!-- Start Capital -->
+            <div class="space-y-1">
+              <label for="invest-capital" class="block text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-bold">Initial Capital ($)</label>
+              <input type="number" id="invest-capital" value="100000" min="1000" step="1000" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-blue-500" />
+            </div>
+
+            <!-- Start Date -->
+            <div class="space-y-1">
+              <label for="invest-start-date" class="block text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-bold">Backtest Start Date</label>
+              <input type="date" id="invest-start-date" value="2026-03-01" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-blue-500" />
+            </div>
+
+            <!-- End Date (Synced) -->
+            <div class="space-y-1">
+              <label class="block text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-bold">Backtest End Date (Synced)</label>
+              <div class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-400 font-mono font-bold select-none cursor-not-allowed" id="invest-end-date-display">
+                2026-09-01
+              </div>
+            </div>
+
+            <div class="text-[11px] text-zinc-500 leading-relaxed bg-zinc-950/40 p-3 rounded-lg border border-zinc-800/40 space-y-1">
+              <span class="text-xs font-semibold text-zinc-400 block font-mono">Sim Rules Checklist:</span>
+              <ul class="list-disc pl-4 space-y-1">
+                <li>Holds maximum of 10 concurrent positions.</li>
+                <li>Restricted to <span class="text-zinc-300 font-semibold">max 2 stocks per sector</span>.</li>
+                <li>Free cash divides equally among empty slots.</li>
+                <li>Idle cash collects <span class="text-zinc-300 font-semibold">1% p.a. interest</span>.</li>
+                <li>Dividends add <span class="text-zinc-300 font-semibold">1.5% p.a.</span> to free cash.</li>
+              </ul>
+            </div>
+          </div>
+
+          <button id="run-simulation-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-mono font-bold text-xs py-3 rounded-lg transition-all cursor-pointer shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2">
+            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.64 8.38m6.16 3.41a14.96 14.96 0 01-10.37 3.39c-1.6 0-3.11-.32-4.49-.89a14.9 14.9 0 01-1.33-6.16 14.9 14.9 0 018.65-11.45 14.9 14.9 0 018.65 11.45z" />
+            </svg>
+            <span>LAUNCH HISTORICAL BACKTEST</span>
+          </button>
+        </div>
+
+        <!-- Pool Selector & Main Performance Right Panels -->
+        <div class="lg:col-span-2 space-y-6 flex flex-col">
+          
+          <!-- Selected Stocks Pool Basket -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
+            <div class="flex justify-between items-center border-b border-zinc-800 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono font-bold uppercase text-zinc-500">Backtest Investment Pool</span>
+                <span id="pool-count-badge" class="bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">0 / 20</span>
+              </div>
+              <button id="clear-pool-btn" class="text-[10px] font-mono text-zinc-500 hover:text-rose-400 cursor-pointer">Clear Pool</button>
+            </div>
+            
+            <div id="pool-stocks-container" class="flex flex-wrap gap-2 py-2 min-h-[44px]">
+              <!-- Dynamically populated or empty hint -->
+              <span class="text-xs text-zinc-500 font-mono italic">No stocks added to the pool yet. Go to the OVERVIEW tab to build your custom pool of up to 20 stocks.</span>
+            </div>
+          </div>
+
+          <!-- Simulation Output Results -->
+          <div id="sim-results-card" class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-6 flex-grow">
+            
+            <!-- Result Metric Boxes -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-zinc-950 border border-zinc-800/80 rounded-lg p-3.5">
+                <span class="text-[9px] uppercase tracking-wider font-mono text-zinc-500 block">Initial Value</span>
+                <span id="res-init-val" class="text-base font-bold font-mono text-zinc-300">$100,000</span>
+              </div>
+              <div class="bg-zinc-950 border border-zinc-800/80 rounded-lg p-3.5">
+                <span class="text-[9px] uppercase tracking-wider font-mono text-zinc-500 block">Ending Value</span>
+                <span id="res-end-val" class="text-base font-bold font-mono text-white">$100,000</span>
+              </div>
+              <div class="bg-zinc-950 border border-zinc-800/80 rounded-lg p-3.5">
+                <span class="text-[9px] uppercase tracking-wider font-mono text-zinc-500 block">Return / Gain</span>
+                <span id="res-earnings" class="text-base font-bold font-mono text-emerald-400">+$0.00 (+0.0%)</span>
+              </div>
+              <div class="bg-zinc-950 border border-zinc-800/80 rounded-lg p-3.5">
+                <span class="text-[9px] uppercase tracking-wider font-mono text-zinc-500 block">Benchmark Return</span>
+                <span id="res-benchmarks" class="text-xs font-bold font-mono text-zinc-400 block mt-0.5">S&P 100: <span class="text-zinc-200">0.0%</span></span>
+                <span id="res-benchmark-500" class="text-[10px] font-mono text-zinc-500 block">S&P 500: <span class="text-zinc-400">0.0%</span></span>
+              </div>
+            </div>
+
+            <!-- Comparison Line Graph Chart Container -->
+            <div class="bg-zinc-950 border border-zinc-800/80 rounded-lg p-4 space-y-2">
+              <div class="flex justify-between items-center">
+                <h4 class="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400">Equity Growth Curve Comparison</h4>
+                <div class="flex items-center gap-4 text-[9px] font-mono">
+                  <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-blue-500 inline-block"></span> Portfolio</span>
+                  <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-zinc-500 inline-block"></span> S&P 100</span>
+                  <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-amber-600 inline-block"></span> S&P 500</span>
+                </div>
+              </div>
+              
+              <!-- SVG chart wrapper -->
+              <div id="equity-chart-container" class="h-44 flex items-center justify-center">
+                <span class="text-xs text-zinc-600 font-mono">Click "LAUNCH HISTORICAL BACKTEST" to plot equity performance curve.</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Stocks Held Table (Earnings breakdown per stock) -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+        <div class="px-5 py-3.5 bg-zinc-900 border-b border-zinc-800">
+          <span class="text-xs font-mono uppercase text-zinc-400 tracking-widest font-bold">Roster Investment Earnings Breakdown</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-zinc-800 bg-zinc-950/40 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                <th class="py-3 px-5 font-medium">Stock Name & Ticker</th>
+                <th class="py-3 px-4 font-medium">Sector</th>
+                <th class="py-3 px-4 font-medium text-center">Sim Trades Count</th>
+                <th class="py-3 px-4 font-medium text-right">Average Buy Cost</th>
+                <th class="py-3 px-4 font-medium text-right">Average Sell Price</th>
+                <th class="py-3 px-4 font-medium text-right">Total Net Gain / ROI</th>
+                <th class="py-3 px-5 font-medium text-center">Active Position</th>
+              </tr>
+            </thead>
+            <tbody id="invest-earnings-list" class="divide-y divide-zinc-800/60 font-sans text-xs">
+              <tr>
+                <td colspan="7" class="py-8 text-center text-zinc-500 font-mono">
+                  Launch backtest to display detailed stock-by-stock portfolio contributions.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Overview Screen (Hidden by Default) -->
+    <section id="overview-tab-content" class="hidden space-y-6">
 
     <!-- Historical Timeline Selection Section -->
     <section class="mb-6 bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -200,7 +363,7 @@
                 <th class="py-4 px-4 font-medium text-center">MACD Signal / Action</th>
                 <th class="py-4 px-4 font-medium text-center">Piotroski F-Score</th>
                 <th class="py-4 px-4 font-medium text-center">Volatility (1M / 1Y)</th>
-                <th class="py-4 px-6 font-medium text-right w-16">Exclude</th>
+                <th class="py-4 px-6 font-medium text-center w-24">Invest Pool</th>
               </tr>
             </thead>
             <tbody id="stocks-list" class="divide-y divide-zinc-800/60 font-sans">
@@ -268,6 +431,7 @@
 
       </div>
     </main>
+    </section>
 
     <!-- Footer Information -->
     <footer class="mt-12 pt-6 border-t border-zinc-900 text-xs text-zinc-500 flex flex-col sm:flex-row justify-between items-center gap-4">

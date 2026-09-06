@@ -19,12 +19,16 @@ async function startServer() {
   async function fetchTickerCikMap() {
     if (tickerCikMap) return tickerCikMap;
     try {
-      console.log('Fetching ticker CIK map from SEC EDGAR...');
+      console.log('Fetching ticker CIK map from SEC EDGAR with timeout...');
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 1000);
       const response = await fetch('https://www.sec.gov/files/company_tickers.json', {
+        signal: controller.signal,
         headers: {
           'User-Agent': 'Station11 Analytics gkirchmayer@gmail.com'
         }
       });
+      clearTimeout(id);
       if (response.ok) {
         const json = await response.json();
         tickerCikMap = {};
@@ -37,7 +41,7 @@ async function startServer() {
         console.error(`SEC ticker map returned status ${response.status}`);
       }
     } catch (e) {
-      console.error('Failed to fetch ticker-CIK map from SEC:', e);
+      console.error('Failed to fetch ticker-CIK map from SEC within timeout:', e.message || e);
     }
     return null;
   }
@@ -79,13 +83,17 @@ async function startServer() {
       const paddedCik = String(cik).padStart(10, '0');
       const factsUrl = `https://data.sec.gov/api/xbrl/companyfacts/CIK${paddedCik}.json`;
 
-      console.log(`Fetching XBRL company facts for ${ticker} (CIK: ${paddedCik}) from SEC...`);
+      console.log(`Fetching XBRL company facts for ${ticker} (CIK: ${paddedCik}) from SEC with timeout...`);
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 1200);
       const response = await fetch(factsUrl, {
+        signal: controller.signal,
         headers: {
           'User-Agent': 'Station11 Analytics gkirchmayer@gmail.com',
           'Accept-Encoding': 'gzip, deflate'
         }
       });
+      clearTimeout(id);
 
       if (!response.ok) {
         throw new Error(`SEC EDGAR API responded with ${response.status}`);
@@ -432,33 +440,45 @@ function calculateRealFScore(facts, ticker, isSimulated = false) {
 // Generate a structured and realistic intelligent brief fallback
 function getSimulatedBrief(stocks, timeline) {
   const sectors = {};
+  const sectorCounts = {};
   stocks.forEach(s => {
     sectors[s.sector] = (sectors[s.sector] || 0) + (s.changePercent || 0);
+    sectorCounts[s.sector] = (sectorCounts[s.sector] || 0) + 1;
   });
-  const topSector = Object.keys(sectors).sort((a,b) => sectors[b] - sectors[a])[0] || 'N/A';
-  
-  const lowScores = stocks.filter(s => s.scoreVal <= 4).map(s => s.ticker);
-  const highVols = stocks.filter(s => s.oneMonthVol > 25).map(s => s.ticker);
-  
-  let bulletsHtml = '';
-  if (lowScores.length > 0) {
-    bulletsHtml += `<li><strong>Balance Sheet Risk:</strong> Watch <strong>${lowScores.join(', ')}</strong> due to sub-optimal Piotroski F-Scores (score &le; 4), indicating structural fundamental headwinds.</li>`;
-  } else {
-    bulletsHtml += `<li><strong>Fundamental Stability:</strong> Solid Piotroski profiles across the board suggest a highly robust, cash-generative asset list.</li>`;
-  }
-  
-  if (highVols.length > 0) {
-    bulletsHtml += `<li><strong>High-Beta Turbulence:</strong> Elevated 1-Month annualized volatility in <strong>${highVols.join(', ')}</strong> warrants tight stop-losses for risk-averse positioning.</li>`;
-  }
-  
-  bulletsHtml += `<li><strong>Sector Rotation:</strong> <strong>${topSector}</strong> currently leads the relative strength index, whereas MACD momentum signals point to localized consolidation.</li>`;
 
-  return `
-    <p>STATION.11 automated strategic assessment indicates localized sector trends under the current <strong>${timeline.toUpperCase()}</strong> horizon:</p>
-    <ul class="list-disc pl-5 mt-2 space-y-1.5">
-      ${bulletsHtml}
-    </ul>
-  `;
+  const sectorAverages = [];
+  Object.keys(sectors).forEach(sec => {
+    sectorAverages.push({
+      name: sec,
+      avg: sectors[sec] / sectorCounts[sec]
+    });
+  });
+
+  sectorAverages.sort((a, b) => b.avg - a.avg);
+  const bestSector = sectorAverages[0];
+  const worstSector = sectorAverages[sectorAverages.length - 1];
+
+  const buys = stocks.filter(s => s.macdSignal === 'BUY').map(s => s.ticker);
+  const sells = stocks.filter(s => s.macdSignal === 'SELL').map(s => s.ticker);
+
+  const buyText = buys.length > 0 ? `<strong>${buys.join(', ')}</strong>` : 'None';
+  const sellText = sells.length > 0 ? `<strong>${sells.join(', ')}</strong>` : 'None';
+
+  let html = `<p>STATION.11 Tactical Intelligence Briefing for the <strong>${timeline.toUpperCase()}</strong> horizon:</p>`;
+  html += `<ul class="list-disc pl-5 mt-2 space-y-1.5">`;
+  html += `<li><strong>Active Crossovers Today:</strong> BUYS (MACD bullish crossover today): ${buyText}. SELLS (MACD bearish crossover today): ${sellText}. Note that execution should happen only on active crossover days.</li>`;
+
+  if (bestSector && worstSector) {
+    html += `<li><strong>Sector Strength Analysis:</strong> Outperforming sector: <strong>${bestSector.name}</strong> (average return +${bestSector.avg.toFixed(2)}%). Underperforming sector: <strong>${worstSector.name}</strong> (average return ${worstSector.avg.toFixed(2)}%).</li>`;
+  }
+
+  const lowScores = stocks.filter(s => s.scoreVal <= 4).map(s => s.ticker);
+  if (lowScores.length > 0) {
+    html += `<li><strong>Fundamental Liquidity Warning:</strong> Closely monitor <strong>${lowScores.slice(0, 5).join(', ')}</strong> due to depressed Piotroski F-Scores (&le; 4), which indicate heightened balance-sheet and profitability friction.</li>`;
+  }
+  html += `</ul>`;
+
+  return html;
 }
 
 startServer();
