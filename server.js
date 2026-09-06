@@ -3,12 +3,16 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { GoogleGenAI } from '@google/genai';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function startServer() {
   const app = express();
   const port = process.env.PORT || 3000;
+
+  // Enable JSON request body parsing
+  app.use(express.json());
 
   // CIK Cache and Ticker mapping
   let tickerCikMap = null;
@@ -98,6 +102,61 @@ async function startServer() {
     } catch (error) {
       console.warn(`Error calculating real F-Score for ${ticker}: ${error.message}. Falling back to calibrated procedural calculations.`);
       return res.json(generateSimulatedFScore(ticker));
+    }
+  });
+
+  // API endpoint for AI Strategic Intelligence Briefing
+  app.post('/api/summary', async (req, res) => {
+    const { stocks, timeline } = req.body || { stocks: [], timeline: '1m' };
+    
+    if (!stocks || stocks.length === 0) {
+      return res.json({
+        summary: `<p class="text-zinc-500 font-mono">No active stocks in matrix to construct a tactical briefing. Add stocks below to initialize.</p>`
+      });
+    }
+
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn('GEMINI_API_KEY environment variable is not defined. Falling back to simulated intelligent brief.');
+        return res.json({ summary: getSimulatedBrief(stocks, timeline) });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
+
+      const prompt = `You are a world-class financial analyst and quantitative strategist at STATION.11, an ultra-premium tactical stock intelligence dashboard.
+Analyze the following portfolio matrix:
+${stocks.map(s => `- Ticker: ${s.ticker}, Name: ${s.name}, Sector: ${s.sector}, Price: $${s.price}, Change: ${s.changePercent}%, MACD Signal: ${s.macdSignal}, Piotroski F-Score: ${s.scoreVal}/9, 1-Month Volatility: ${s.oneMonthVol.toFixed(1)}%, 1-Year Volatility: ${s.oneYearVol.toFixed(1)}%`).join('\n')}
+
+Timeline setting: ${timeline}.
+
+Produce a highly professional, dense, and tactical market intelligence briefing.
+Guidelines:
+1. Identify high-level **developments** (e.g. sectors showing synchronized MACD momentum or volatility divergence).
+2. Highlight key **things to look out for** (e.g. specific tickers with low Piotroski f-scores indicating underlying balance-sheet stress, or buy signals in high-volatility contexts).
+3. Do not include introductory filler or self-referential greetings. Start directly with the tactical takeaways.
+4. Format your entire response in beautifully typeset HTML tags: use <strong> for bold key phrases, <p> for paragraphs, and <ul class="list-disc pl-5 mt-2 space-y-2"> with <li> for bullet lists. Ensure high contrast and professional style.
+5. Limit the output to 2-3 powerful, scannable bullet points or 2 short paragraphs. Keep it extremely high signal-to-noise.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt
+      });
+
+      let summaryHtml = response.text || '';
+      summaryHtml = summaryHtml.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
+
+      return res.json({ summary: summaryHtml });
+    } catch (e) {
+      console.error('Gemini API call failed for summary:', e);
+      return res.json({ summary: getSimulatedBrief(stocks, timeline) });
     }
   });
 
@@ -305,6 +364,38 @@ function calculateRealFScore(facts, ticker, isSimulated = false) {
     },
     breakdown: { f1, f2, f3, f4, f5, f6, f7, f8, f9 }
   };
+}
+
+// Generate a structured and realistic intelligent brief fallback
+function getSimulatedBrief(stocks, timeline) {
+  const sectors = {};
+  stocks.forEach(s => {
+    sectors[s.sector] = (sectors[s.sector] || 0) + (s.changePercent || 0);
+  });
+  const topSector = Object.keys(sectors).sort((a,b) => sectors[b] - sectors[a])[0] || 'N/A';
+  
+  const lowScores = stocks.filter(s => s.scoreVal <= 4).map(s => s.ticker);
+  const highVols = stocks.filter(s => s.oneMonthVol > 25).map(s => s.ticker);
+  
+  let bulletsHtml = '';
+  if (lowScores.length > 0) {
+    bulletsHtml += `<li><strong>Balance Sheet Risk:</strong> Watch <strong>${lowScores.join(', ')}</strong> due to sub-optimal Piotroski F-Scores (score &le; 4), indicating structural fundamental headwinds.</li>`;
+  } else {
+    bulletsHtml += `<li><strong>Fundamental Stability:</strong> Solid Piotroski profiles across the board suggest a highly robust, cash-generative asset list.</li>`;
+  }
+  
+  if (highVols.length > 0) {
+    bulletsHtml += `<li><strong>High-Beta Turbulence:</strong> Elevated 1-Month annualized volatility in <strong>${highVols.join(', ')}</strong> warrants tight stop-losses for risk-averse positioning.</li>`;
+  }
+  
+  bulletsHtml += `<li><strong>Sector Rotation:</strong> <strong>${topSector}</strong> currently leads the relative strength index, whereas MACD momentum signals point to localized consolidation.</li>`;
+
+  return `
+    <p>STATION.11 automated strategic assessment indicates localized sector trends under the current <strong>${timeline.toUpperCase()}</strong> horizon:</p>
+    <ul class="list-disc pl-5 mt-2 space-y-1.5">
+      ${bulletsHtml}
+    </ul>
+  `;
 }
 
 startServer();
