@@ -255,43 +255,81 @@
     <!-- Tab 2: Overview Screen (Hidden by Default) -->
     <section id="overview-tab-content" class="hidden space-y-6">
 
-    <!-- Historical Timeline Selection Section -->
-    <section class="mb-6 bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div class="flex flex-col w-full md:w-auto">
-        <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Historical Timeline</span>
-        <div class="flex flex-wrap gap-2" id="timeline-selector-container">
-          <button data-timeline="1w" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-            1 Week
-          </button>
-          <button data-timeline="1m" class="timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer">
-            1 Month
-          </button>
-          <button data-timeline="1q" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-            1 Quarter
-          </button>
-          <button data-timeline="1y" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-            1 Year
-          </button>
-          <button data-timeline="5y" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-            5 Years
-          </button>
-          <button data-timeline="ytd" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-            YTD
-          </button>
-          <button data-timeline="manual" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-            Manual Start
-          </button>
+      <!-- Dynamic S&P 100 Index Headline Hero Banner -->
+      <div class="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800/80 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+            <h2 class="text-lg font-mono font-extrabold uppercase tracking-widest text-white">S&P 100 Index Terminal</h2>
+          </div>
+          <p class="text-xs text-zinc-400 font-sans max-w-xl">
+            Real-time multi-criteria matrix analyzing constituent momentum trends, risk volatility profiles, and financial stability criteria.
+          </p>
+        </div>
+        
+        <!-- Index Metrics -->
+        <div class="flex flex-wrap gap-4">
+          <div class="bg-zinc-950/60 border border-zinc-800 px-4 py-2.5 rounded-lg font-mono min-w-[150px]">
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block">Index Development</span>
+            <span id="index-headline-dev" class="text-base font-bold text-zinc-400">Calculating...</span>
+          </div>
+          <div class="bg-zinc-950/60 border border-zinc-800 px-4 py-2.5 rounded-lg font-mono min-w-[180px]">
+            <span class="text-[9px] uppercase tracking-wider text-zinc-500 block">Overall MACD Momentum</span>
+            <span id="index-headline-macd" class="text-xs font-bold text-zinc-400 block mt-0.5">Loading Matrix...</span>
+          </div>
         </div>
       </div>
 
-      <!-- Manual Start Date Picker Box (Conditional on 'manual' selection) -->
-      <div id="manual-date-picker-box" class="hidden flex-col">
-        <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Starting Date</span>
-        <div class="bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 flex items-center gap-2 shadow-inner">
-          <input type="date" id="manual-start-date" class="bg-transparent text-sm font-mono font-bold text-white outline-none border-none cursor-pointer focus:ring-0 p-0" />
+      <!-- Slide Button / Filter Selector & Historical Timeline Control Section -->
+      <section class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <!-- Slide toggle for Top 30 vs All 100 -->
+        <div class="flex flex-col">
+          <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Display Mode</span>
+          <div class="relative flex bg-zinc-950 p-1 rounded-lg border border-zinc-800 w-64 select-none">
+            <button id="mode-all-btn" class="flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all bg-blue-600 text-white">
+              All 100 Stocks
+            </button>
+            <button id="mode-top30-btn" class="flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all text-zinc-400 hover:text-white">
+              Top 30 (3/Sec)
+            </button>
+          </div>
         </div>
-      </div>
-    </section>
+
+        <div class="flex flex-col w-full lg:w-auto">
+          <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Historical Timeline</span>
+          <div class="flex flex-wrap gap-2" id="timeline-selector-container">
+            <button data-timeline="1w" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+              1 Week
+            </button>
+            <button data-timeline="1m" class="timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer">
+              1 Month
+            </button>
+            <button data-timeline="1q" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+              1 Quarter
+            </button>
+            <button data-timeline="1y" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+              1 Year
+            </button>
+            <button data-timeline="5y" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+              5 Years
+            </button>
+            <button data-timeline="ytd" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+              YTD
+            </button>
+            <button data-timeline="manual" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+              Manual Start
+            </button>
+          </div>
+        </div>
+
+        <!-- Manual Start Date Picker Box (Conditional on 'manual' selection) -->
+        <div id="manual-date-picker-box" class="hidden flex-col">
+          <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Starting Date</span>
+          <div class="bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 flex items-center gap-2 shadow-inner">
+            <input type="date" id="manual-start-date" class="bg-transparent text-sm font-mono font-bold text-white outline-none border-none cursor-pointer focus:ring-0 p-0" />
+          </div>
+        </div>
+      </section>
 
     <!-- AI-Powered Strategic Intelligence Briefing -->
     <section id="ai-briefing-section" class="mb-6 bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 backdrop-blur-md relative overflow-hidden flex flex-col gap-3">
@@ -339,6 +377,14 @@
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               <span>S&P 100 CSV LOADING...</span>
+            </div>
+            <!-- Piotroski F-Score Calculation Progress Indicator -->
+            <div id="fscore-progress-container" class="hidden items-center gap-3 bg-zinc-950 border border-zinc-800 px-3 py-1 rounded-lg text-[11px] font-mono">
+              <span class="text-zinc-400">Piotroski Progress:</span>
+              <div class="w-24 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                <div id="fscore-progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-150"></div>
+              </div>
+              <span id="fscore-progress-text" class="text-zinc-300 font-bold">0%</span>
             </div>
           </div>
           <div class="flex items-center gap-4 text-xs text-zinc-400 font-mono">

@@ -144,6 +144,7 @@ let isCsvLoading = false;
 
 // Selection pool restricted to 20 stocks maximum
 let investPool = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'JPM', 'LLY', 'UNH', 'XOM'];
+let displayMode = 'all'; // 'all' or 'top30'
 
 // Load or restore default stocks list
 function getDefaultStocksList(dateVal) {
@@ -622,6 +623,13 @@ async function fetchTwelveData(tickers, apiKey, displayDays) {
   }
 }
 
+function getNormalizedSector(sector) {
+  if (sector === 'Real Estate' || sector === 'Utilities') {
+    return 'Utilities & Real Estate';
+  }
+  return sector;
+}
+
 // Render S&P 100 main overview dashboard with sector grouping and headers
 async function renderDashboard() {
   const container = document.getElementById('stocks-list');
@@ -631,7 +639,7 @@ async function renderDashboard() {
   
   activeCountLabel.textContent = stocks.length;
   
-  // No strict artificial stock limitations now
+  // Restores standard controls
   const showAddBtn = document.getElementById('show-add-form-btn');
   if (showAddBtn) {
     showAddBtn.disabled = false;
@@ -654,6 +662,65 @@ async function renderDashboard() {
     `;
     return;
   }
+
+  // 1. SEQUENTIAL PIOTROSKI F-SCORE CALCULATION (ONE-BY-ONE)
+  // Ensure that all F-scores are calculated one-by-one before sorting or rendering
+  container.innerHTML = `
+    <tr>
+      <td colspan="8" class="py-16 text-center text-zinc-400 text-xs font-mono">
+        <div class="flex flex-col items-center justify-center gap-3.5 max-w-sm mx-auto bg-zinc-950/60 p-6 rounded-xl border border-zinc-800/80">
+          <svg class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span id="calculating-fscores-status" class="text-[11px] font-bold text-zinc-300">Analyzing SEC financials one by one...</span>
+          <div class="w-full bg-zinc-900 rounded-full h-1 overflow-hidden mt-1">
+            <div id="loading-inner-bar" class="bg-blue-500 h-full w-0 transition-all duration-150"></div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
+
+  const fProgress = document.getElementById('fscore-progress-container');
+  if (fProgress) {
+    fProgress.classList.remove('hidden');
+    fProgress.classList.add('flex');
+  }
+
+  for (let i = 0; i < stocks.length; i++) {
+    const stock = stocks[i];
+    const pct = Math.round(((i + 1) / stocks.length) * 100);
+    
+    const pBar = document.getElementById('fscore-progress-bar');
+    const pTxt = document.getElementById('fscore-progress-text');
+    const innerBar = document.getElementById('loading-inner-bar');
+    const statusSpan = document.getElementById('calculating-fscores-status');
+    
+    if (pBar) pBar.style.width = `${pct}%`;
+    if (pTxt) pTxt.textContent = `${pct}% (${i + 1}/${stocks.length})`;
+    if (innerBar) innerBar.style.width = `${pct}%`;
+    if (statusSpan) statusSpan.textContent = `Analyzing: ${stock.ticker} (${i + 1} of ${stocks.length})`;
+    
+    if (!fScoresCache[stock.ticker]) {
+      try {
+        const res = await fetch(`/api/fscore?ticker=${stock.ticker}`);
+        if (res.ok) {
+          fScoresCache[stock.ticker] = await res.json();
+        }
+      } catch (error) {
+        console.error(`Failed to calculate F-score for ${stock.ticker}:`, error);
+      }
+    }
+  }
+
+  // Once all calculated, hide progress container after a small grace delay
+  setTimeout(() => {
+    if (fProgress) fProgress.classList.add('hidden');
+  }, 1000);
+
+  // Clear container loading state
+  container.innerHTML = '';
 
   const { daysCount, label: timelineLabel } = getTimelineDetails();
   
@@ -738,9 +805,41 @@ async function renderDashboard() {
       scoreVal,
       oneMonthVol,
       oneYearVol,
-      latestHistVal
+      latestHistVal,
+      sector: getNormalizedSector(stock.sector) // Ensure normalized sectors always
     };
   });
+
+  // Calculate & Render overall S&P 100 Index Headline details
+  if (processedStocks.length > 0) {
+    const totalChange = processedStocks.reduce((acc, s) => {
+      const startClose = s.history[s.history.length - daysCount]?.close || s.basePrice;
+      const changeFromStart = ((s.lastDay.close - startClose) / startClose) * 100;
+      return acc + changeFromStart;
+    }, 0) / processedStocks.length;
+
+    const avgMacdMom = processedStocks.reduce((acc, s) => acc + s.latestHistVal, 0) / processedStocks.length;
+
+    const devLabel = document.getElementById('index-headline-dev');
+    if (devLabel) {
+      devLabel.className = `text-sm font-black font-mono ${totalChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+      devLabel.textContent = `${totalChange >= 0 ? '▲ +' : '▼ '}${totalChange.toFixed(2)}%`;
+    }
+
+    const macdLabel = document.getElementById('index-headline-macd');
+    if (macdLabel) {
+      let momClass = 'text-zinc-400';
+      let momText = 'Neutral';
+      if (avgMacdMom > 0.05) {
+        momClass = 'text-emerald-400 font-bold';
+        momText = 'Bullish';
+      } else if (avgMacdMom < -0.05) {
+        momClass = 'text-rose-400 font-bold';
+        momText = 'Bearish';
+      }
+      macdLabel.innerHTML = `<span class="${momClass}">${avgMacdMom >= 0 ? '+' : ''}${avgMacdMom.toFixed(4)} • ${momText}</span>`;
+    }
+  }
 
   // Group by sector
   const sectorsMap = {};
@@ -753,7 +852,7 @@ async function renderDashboard() {
 
   const sortedSectors = Object.keys(sectorsMap).sort();
 
-  // Sort within sector
+  // Sort within sector: Piotroski F-Score (Desc) -> Volatility Year (Asc) -> Volatility Month (Asc)
   sortedSectors.forEach(sector => {
     sectorsMap[sector].sort((a, b) => {
       if (b.scoreVal !== a.scoreVal) return b.scoreVal - a.scoreVal;
@@ -762,8 +861,22 @@ async function renderDashboard() {
     });
   });
 
+  // Slide Filter Selection Logic
+  // If displayMode === 'top30', restrict each of the 10 sectors to exactly its top 3 companies
+  sortedSectors.forEach(sector => {
+    if (displayMode === 'top30') {
+      sectorsMap[sector] = sectorsMap[sector].slice(0, 3);
+    }
+  });
+
+  let displayedCount = 0;
+
   sortedSectors.forEach(sector => {
     const sectorStocks = sectorsMap[sector];
+    if (sectorStocks.length === 0) return;
+
+    displayedCount += sectorStocks.length;
+
     const sumPrices = sectorStocks.reduce((sum, s) => sum + s.lastDay.close, 0);
     let weightedHistAvg = 0;
     
@@ -872,6 +985,8 @@ async function renderDashboard() {
         : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:bg-zinc-900 hover:text-white';
       const poolBtnText = isInPool ? '★ In Pool' : '+ Add Pool';
 
+      const fScoreData = fScoresCache[stock.ticker];
+
       row.innerHTML = `
         <td class="py-4 px-6">
           <div class="flex flex-col">
@@ -907,7 +1022,7 @@ async function renderDashboard() {
           </div>
         </td>
         <td class="py-4 px-4 text-center" id="fscore-cell-${stock.ticker}">
-          <!-- Progressive load -->
+          ${getFScoreBadgeHtml(stock.ticker, fScoreData)}
         </td>
         <td class="py-4 px-4 text-center">
           <div class="flex flex-col items-center justify-center">
@@ -923,15 +1038,21 @@ async function renderDashboard() {
       `;
       container.appendChild(row);
 
-      // Load F-score cell
-      if (fScoresCache[stock.ticker]) {
-        updateFScoreCell(stock.ticker, fScoresCache[stock.ticker]);
-      } else {
-        updateFScoreCell(stock.ticker, null);
-        fetchFScore(stock.ticker);
+      // Register modal handler instantly on fscore button click
+      const cell = row.querySelector(`#fscore-cell-${stock.ticker}`);
+      if (cell) {
+        const btn = cell.querySelector('button');
+        if (btn && fScoreData) {
+          btn.addEventListener('click', () => {
+            showFScoreDetailsModal(fScoreData);
+          });
+        }
       }
     });
   });
+
+  // Update dynamic count label to display only the actually loaded/filtered stocks count
+  activeCountLabel.textContent = displayedCount;
 
   // Toggle Pool Membership button click handler
   document.querySelectorAll('.toggle-pool-btn').forEach(btn => {
@@ -1798,6 +1919,26 @@ async function initializeApp() {
 
   // Put Backtest Portfolio in front by default
   selectTab('invest');
+
+  // Display Mode Slide buttons
+  const modeAllBtn = document.getElementById('mode-all-btn');
+  const modeTop30Btn = document.getElementById('mode-top30-btn');
+
+  if (modeAllBtn && modeTop30Btn) {
+    modeAllBtn.addEventListener('click', () => {
+      displayMode = 'all';
+      modeAllBtn.className = "flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all bg-blue-600 text-white";
+      modeTop30Btn.className = "flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all text-zinc-400 hover:text-white bg-transparent";
+      renderDashboard();
+    });
+
+    modeTop30Btn.addEventListener('click', () => {
+      displayMode = 'top30';
+      modeTop30Btn.className = "flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all bg-blue-600 text-white";
+      modeAllBtn.className = "flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all text-zinc-400 hover:text-white bg-transparent";
+      renderDashboard();
+    });
+  }
 
   // Load target dates
   const dateInput = document.getElementById('target-date');
