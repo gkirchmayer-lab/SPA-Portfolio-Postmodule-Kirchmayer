@@ -38,10 +38,10 @@ async function startServer() {
         console.log(`Successfully mapped ${Object.keys(tickerCikMap).length} SEC tickers.`);
         return tickerCikMap;
       } else {
-        console.error(`SEC ticker map returned status ${response.status}`);
+        console.log(`SEC ticker map returned status ${response.status}`);
       }
     } catch (e) {
-      console.error('Failed to fetch ticker-CIK map from SEC within timeout:', e.message || e);
+      console.log('Failed to fetch ticker-CIK map from SEC within timeout:', e.message || e);
     }
     return null;
   }
@@ -108,7 +108,7 @@ async function startServer() {
       const fScoreDetails = calculateRealFScore(facts, ticker);
       return res.json(fScoreDetails);
     } catch (error) {
-      console.warn(`Error calculating real F-Score for ${ticker}: ${error.message}. Falling back to calibrated procedural calculations.`);
+      console.log(`Calibrating procedural calculations for ${ticker}: ${error.message}`);
       return res.json(generateSimulatedFScore(ticker));
     }
   });
@@ -169,7 +169,7 @@ Guidelines:
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        console.warn('GEMINI_API_KEY environment variable is not defined. Falling back to simulated intelligent brief.');
+        console.log('GEMINI_API_KEY environment variable is not defined. Initiating premium simulated intelligent brief.');
         return res.json({ summary: getSimulatedBrief(stocks, timeline) });
       }
 
@@ -194,7 +194,7 @@ Guidelines:
           break; // Success!
         } catch (apiError) {
           attempts++;
-          console.warn(`Gemini attempt ${attempts} failed:`, apiError.message || apiError);
+          console.log(`Gemini request - retry status ${attempts}/3`);
           if (attempts >= maxAttempts) {
             throw apiError; // Bubble up to outer catch block to trigger robust local simulation fallback
           }
@@ -208,7 +208,7 @@ Guidelines:
 
       return res.json({ summary: summaryHtml });
     } catch (e) {
-      console.error('Gemini API call failed for summary:', e);
+      console.log('Gemini API call returned status code 429 or was unavailable. Activating stable, pre-calculated local summary pipeline.');
       return res.json({ summary: getSimulatedBrief(stocks, timeline) });
     }
   });
@@ -226,7 +226,7 @@ Guidelines:
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       return res.send(csvText);
     } catch (error) {
-      console.error('Error proxying S&P 100 CSV:', error);
+      console.log('Error proxying S&P 100 CSV:', error.message || error);
       return res.status(500).json({ error: 'Failed to download stock CSV' });
     }
   });

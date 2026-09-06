@@ -126,7 +126,7 @@
             <!-- Start Date -->
             <div class="space-y-1">
               <label for="invest-start-date" class="block text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-bold">Backtest Start Date</label>
-              <input type="date" id="invest-start-date" value="2026-03-01" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-blue-500" />
+              <input type="date" id="invest-start-date" value="2026-01-01" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-blue-500" />
             </div>
 
             <!-- End Date (Synced) -->
@@ -165,14 +165,14 @@
             <div class="flex justify-between items-center border-b border-zinc-800 pb-2">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-mono font-bold uppercase text-zinc-500">Backtest Investment Pool</span>
-                <span id="pool-count-badge" class="bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">0 / 20</span>
+                <span id="pool-count-badge" class="bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">0 / 30</span>
               </div>
               <button id="clear-pool-btn" class="text-[10px] font-mono text-zinc-500 hover:text-rose-400 cursor-pointer">Clear Pool</button>
             </div>
             
             <div id="pool-stocks-container" class="flex flex-wrap gap-2 py-2 min-h-[44px]">
               <!-- Dynamically populated or empty hint -->
-              <span class="text-xs text-zinc-500 font-mono italic">No stocks added to the pool yet. Go to the OVERVIEW tab to build your custom pool of up to 20 stocks.</span>
+              <span class="text-xs text-zinc-500 font-mono italic">No stocks added to the pool yet. Go to the OVERVIEW tab to build your custom pool of up to 30 stocks.</span>
             </div>
           </div>
 
@@ -286,11 +286,11 @@
         <div class="flex flex-col">
           <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Display Mode</span>
           <div class="relative flex bg-zinc-950 p-1 rounded-lg border border-zinc-800 w-64 select-none">
-            <button id="mode-all-btn" class="flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all bg-blue-600 text-white">
+            <button id="mode-all-btn" class="flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all text-zinc-400 hover:text-white">
               All 100 Stocks
             </button>
-            <button id="mode-top30-btn" class="flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all text-zinc-400 hover:text-white">
-              Top 30 (3/Sec)
+            <button id="mode-top30-btn" class="flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all bg-blue-600 text-white">
+              The Big 30
             </button>
           </div>
         </div>
@@ -301,7 +301,7 @@
             <button data-timeline="1w" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
               1 Week
             </button>
-            <button data-timeline="1m" class="timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer">
+            <button data-timeline="1m" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
               1 Month
             </button>
             <button data-timeline="1q" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
@@ -316,17 +316,17 @@
             <button data-timeline="ytd" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
               YTD
             </button>
-            <button data-timeline="manual" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
+            <button data-timeline="manual" class="timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer">
               Manual Start
             </button>
           </div>
         </div>
 
         <!-- Manual Start Date Picker Box (Conditional on 'manual' selection) -->
-        <div id="manual-date-picker-box" class="hidden flex-col">
+        <div id="manual-date-picker-box" class="flex flex-col">
           <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Starting Date</span>
           <div class="bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 flex items-center gap-2 shadow-inner">
-            <input type="date" id="manual-start-date" class="bg-transparent text-sm font-mono font-bold text-white outline-none border-none cursor-pointer focus:ring-0 p-0" />
+            <input type="date" id="manual-start-date" value="2026-01-01" class="bg-transparent text-sm font-mono font-bold text-white outline-none border-none cursor-pointer focus:ring-0 p-0" />
           </div>
         </div>
       </section>

@@ -40,6 +40,7 @@ const SP100_REGISTRY = [
   { name: 'Caterpillar', ticker: 'CAT', in: '2020-01-01', out: null, sector: 'Industrials' },
   { name: 'Charles Schwab', ticker: 'SCHW', in: '2022-03-21', out: null, sector: 'Financial Services' },
   { name: 'Charter Communications', ticker: 'CHTR', in: '2020-01-01', out: '2025-09-22', sector: 'Communication Services' },
+  { name: 'Constellation Energy', ticker: 'CEG', in: '2022-01-01', out: null, sector: 'Utilities' },
   { name: 'Chevron', ticker: 'CVX', in: '2020-01-01', out: null, sector: 'Energy' },
   { name: 'Cisco', ticker: 'CSCO', in: '2020-01-01', out: null, sector: 'Technology' },
   { name: 'Citigroup', ticker: 'C', in: '2020-01-01', out: null, sector: 'Financial Services' },
@@ -60,6 +61,7 @@ const SP100_REGISTRY = [
   { name: 'Exxon Mobil', ticker: 'XOM', in: '2020-01-01', out: null, sector: 'Energy' },
   { name: 'FedEx', ticker: 'FDX', in: '2020-01-01', out: null, sector: 'Industrials' },
   { name: 'Ford Motor', ticker: 'F', in: '2020-01-01', out: '2025-03-24', sector: 'Consumer Cyclical' },
+  { name: 'Freeport-McMoRan', ticker: 'FCX', in: '2020-01-01', out: null, sector: 'Basic Materials' },
   { name: 'GE Aerospace', ticker: 'GE', in: '2020-01-01', out: null, sector: 'Industrials' },
   { name: 'GE Vernova', ticker: 'GEV', in: '2026-03-23', out: null, sector: 'Industrials' },
   { name: 'General Dynamics', ticker: 'GD', in: '2020-01-01', out: null, sector: 'Industrials' },
@@ -92,6 +94,7 @@ const SP100_REGISTRY = [
   { name: 'Mondelez International', ticker: 'MDLZ', in: '2020-01-01', out: null, sector: 'Consumer Defensive' },
   { name: 'Morgan Stanley', ticker: 'MS', in: '2020-01-01', out: null, sector: 'Financial Services' },
   { name: 'Netflix', ticker: 'NFLX', in: '2020-01-01', out: null, sector: 'Communication Services' },
+  { name: 'Newmont Corporation', ticker: 'NEM', in: '2020-01-01', out: null, sector: 'Basic Materials' },
   { name: 'NextEra Energy', ticker: 'NEE', in: '2020-01-01', out: null, sector: 'Utilities' },
   { name: 'Nike', ticker: 'NKE', in: '2020-01-01', out: null, sector: 'Consumer Cyclical' },
   { name: 'Nvidia', ticker: 'NVDA', in: '2020-01-01', out: null, sector: 'Technology' },
@@ -133,8 +136,8 @@ const SP100_REGISTRY = [
 // Global state
 let stocks = [];
 let targetDate = '2026-09-01';
-let selectedTimeline = '1m'; 
-let manualStartDate = '2026-08-01';
+let selectedTimeline = 'manual'; 
+let manualStartDate = '2026-01-01';
 let twelvedataKey = '';
 let openrouterKey = '';
 const csvCompanyNames = {};
@@ -142,9 +145,22 @@ const expandedSectorCharts = new Set();
 let csvHistoryData = null;
 let isCsvLoading = false;
 
-// Selection pool restricted to 20 stocks maximum
-let investPool = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'JPM', 'LLY', 'UNH', 'XOM'];
-let displayMode = 'all'; // 'all' or 'top30'
+const BIG_30_TICKERS = [
+  'NVDA', 'AAPL', 'MSFT',
+  'GOOGL', 'META', 'NFLX',
+  'AMZN', 'TSLA', 'HD',
+  'LLY', 'UNH', 'JNJ',
+  'BRK.B', 'JPM', 'V',
+  'WMT', 'COST', 'PG',
+  'XOM', 'CVX', 'COP',
+  'GEV', 'RTX', 'CAT',
+  'LIN', 'FCX', 'NEM',
+  'NEE', 'CEG', 'SO'
+];
+
+// Selection pool restricted to 30 stocks maximum
+let investPool = [...BIG_30_TICKERS];
+let displayMode = 'top30'; // 'all' or 'top30'
 
 // Load or restore default stocks list
 function getDefaultStocksList(dateVal) {
@@ -453,20 +469,18 @@ function renderOHLCSparkline(history, displayDays) {
   return svgs;
 }
 
-// Render MACD histogram and lines sparkline
+// Render MACD histogram sparkline (without average lines)
 function renderMACDSparkline(macd, signal, hist, displayDays) {
   const width = 160;
   const height = 36;
   const padding = 3;
   
-  const mDisp = macd.slice(-displayDays);
-  const sDisp = signal.slice(-displayDays);
   const hDisp = hist.slice(-displayDays);
-  const n = mDisp.length;
+  const n = hDisp.length;
   
-  const allVals = [...mDisp, ...sDisp, ...hDisp];
-  const globalMax = Math.max(...allVals);
-  const globalMin = Math.min(...allVals);
+  const allVals = [...hDisp];
+  const globalMax = Math.max(...allVals, 0.01);
+  const globalMin = Math.min(...allVals, -0.01);
   const valRange = (globalMax - globalMin) || 1;
   
   const scaleY = (val) => {
@@ -491,29 +505,8 @@ function renderMACDSparkline(macd, signal, hist, displayDays) {
     const yStart = isPositive ? yHist : zeroY;
     const hBar = Math.max(Math.abs(zeroY - yHist), 0.8);
     
-    svgs += `<rect x="${x - barWidth / 2}" y="${yStart}" width="${barWidth}" height="${hBar}" fill="${barColor}" fill-opacity="0.3" rx="0.2" />`;
+    svgs += `<rect x="${x - barWidth / 2}" y="${yStart}" width="${barWidth}" height="${hBar}" fill="${barColor}" fill-opacity="0.65" rx="0.2" />`;
   });
-  
-  let macdPath = '';
-  let signalPath = '';
-  
-  for (let i = 0; i < n; i++) {
-    const x = i * colWidth + colWidth / 2;
-    const yM = scaleY(mDisp[i]);
-    const yS = scaleY(sDisp[i]);
-    
-    if (i === 0) {
-      macdPath += `M ${x} ${yM}`;
-      signalPath += `M ${x} ${yS}`;
-    } else {
-      macdPath += ` L ${x} ${yM}`;
-      signalPath += ` L ${x} ${yS}`;
-    }
-  }
-  
-  const strokeW = n > 100 ? 0.8 : 1.25;
-  svgs += `<path d="${macdPath}" fill="none" stroke="#38bdf8" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" />`;
-  svgs += `<path d="${signalPath}" fill="none" stroke="#f59e0b" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" />`;
   
   svgs += `</svg>`;
   return svgs;
@@ -539,15 +532,14 @@ function calculateAnnualizedVolatility(history, days) {
 }
 
 // Crossover signal generator
-// "make the sell and buy distinctions only if the crossover has been that day" (on targetDate close)
+// "buy or sell - only when the colour changed that day"
+// "hold or avoid - when the colour has been the same for 2 or more consecutive days"
 function calculateMACDSignal(hist) {
   const hToday = hist[hist.length - 1] || 0;
   const hYesterday = hist[hist.length - 2] || 0;
   
-  const crossedToGreenToday = hToday > 0 && hYesterday <= 0;
-  const crossedToRedToday = hToday < 0 && hYesterday >= 0;
-  
-  const threshold = 0.03; // Momentum flat boundary
+  const isGreenToday = hToday >= 0;
+  const isGreenYesterday = hYesterday >= 0;
 
   let text = 'HOLD';
   let badgeClass = 'bg-zinc-900/80 text-zinc-400 border border-zinc-800';
@@ -558,49 +550,44 @@ function calculateMACDSignal(hist) {
     </svg>
   `;
   
-  if (crossedToGreenToday) {
+  if (isGreenToday && !isGreenYesterday) {
+    // Red yesterday, Green today -> BUY (color changed to green today)
     text = 'BUY';
-    badgeClass = 'bg-emerald-500 text-black border border-emerald-400 font-extrabold shadow-md shadow-emerald-950/40';
-    desc = 'Bullish Crossover Today';
+    badgeClass = 'bg-emerald-500 text-black border border-emerald-400 font-extrabold shadow-md shadow-emerald-950/40 animate-pulse';
+    desc = 'Crossover to Green Today';
     icon = `
       <svg class="w-3.5 h-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l7.5-7.5 7.5 7.5m-15 6l7.5-7.5 7.5 7.5" />
       </svg>
     `;
-  } else if (crossedToRedToday) {
+  } else if (!isGreenToday && isGreenYesterday) {
+    // Green yesterday, Red today -> SELL (color changed to red today)
     text = 'SELL';
-    badgeClass = 'bg-rose-500 text-black border border-rose-400 font-extrabold shadow-md shadow-rose-950/40';
-    desc = 'Bearish Crossover Today';
+    badgeClass = 'bg-rose-500 text-black border border-rose-400 font-extrabold shadow-md shadow-rose-950/40 animate-pulse';
+    desc = 'Crossover to Red Today';
     icon = `
       <svg class="w-3.5 h-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 5.25l-7.5 7.5-7.5-7.5m15 6l-7.5 7.5-7.5-7.5" />
       </svg>
     `;
-  } else if (Math.abs(hToday) < threshold) {
-    text = 'NEUTRAL (HOLD)';
-    badgeClass = 'bg-zinc-800/80 text-zinc-400 border border-zinc-700';
-    desc = 'MACD momentum flat';
+  } else if (isGreenToday && isGreenYesterday) {
+    // Sustained Green -> HOLD (color same for 2 or more consecutive days)
+    text = 'HOLD';
+    badgeClass = 'bg-emerald-950/30 text-emerald-400 border border-emerald-900/60';
+    desc = 'Sustained Green Momentum';
     icon = `
-      <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
       </svg>
     `;
-  } else if (hToday > 0) {
-    text = 'BULLISH (BUY)';
-    badgeClass = 'bg-emerald-950/30 text-emerald-400 border border-emerald-900/60';
-    desc = 'Bullish momentum trend';
-    icon = `
-      <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-      </svg>
-    `;
   } else {
-    text = 'BEARISH (SELL)';
+    // Sustained Red -> AVOID (color same for 2 or more consecutive days)
+    text = 'AVOID';
     badgeClass = 'bg-rose-950/20 text-rose-400 border border-rose-900/60';
-    desc = 'Bearish momentum trend';
+    desc = 'Sustained Red Momentum';
     icon = `
       <svg class="w-3.5 h-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     `;
   }
@@ -637,7 +624,12 @@ async function renderDashboard() {
   if (!container) return;
   container.innerHTML = '';
   
-  activeCountLabel.textContent = stocks.length;
+  // Custom display filtering for the Big 30 vs all 100
+  const activeList = displayMode === 'top30' 
+    ? stocks.filter(s => BIG_30_TICKERS.includes(s.ticker))
+    : stocks;
+
+  activeCountLabel.textContent = activeList.length;
   
   // Restores standard controls
   const showAddBtn = document.getElementById('show-add-form-btn');
@@ -652,7 +644,7 @@ async function renderDashboard() {
     `;
   }
 
-  if (stocks.length === 0) {
+  if (activeList.length === 0) {
     container.innerHTML = `
       <tr>
         <td colspan="8" class="py-12 text-center text-zinc-500 text-sm font-mono">
@@ -688,9 +680,12 @@ async function renderDashboard() {
     fProgress.classList.add('flex');
   }
 
-  for (let i = 0; i < stocks.length; i++) {
-    const stock = stocks[i];
-    const pct = Math.round(((i + 1) / stocks.length) * 100);
+  const big30Active = stocks.filter(s => BIG_30_TICKERS.includes(s.ticker));
+  const remainingActive = stocks.filter(s => !BIG_30_TICKERS.includes(s.ticker));
+
+  for (let i = 0; i < big30Active.length; i++) {
+    const stock = big30Active[i];
+    const pct = Math.round(((i + 1) / big30Active.length) * 100);
     
     const pBar = document.getElementById('fscore-progress-bar');
     const pTxt = document.getElementById('fscore-progress-text');
@@ -698,9 +693,9 @@ async function renderDashboard() {
     const statusSpan = document.getElementById('calculating-fscores-status');
     
     if (pBar) pBar.style.width = `${pct}%`;
-    if (pTxt) pTxt.textContent = `${pct}% (${i + 1}/${stocks.length})`;
+    if (pTxt) pTxt.textContent = `${pct}% (${i + 1}/${big30Active.length})`;
     if (innerBar) innerBar.style.width = `${pct}%`;
-    if (statusSpan) statusSpan.textContent = `Analyzing: ${stock.ticker} (${i + 1} of ${stocks.length})`;
+    if (statusSpan) statusSpan.textContent = `Analyzing priority roster: ${stock.ticker} (${i + 1} of ${big30Active.length})`;
     
     if (!fScoresCache[stock.ticker]) {
       try {
@@ -709,12 +704,15 @@ async function renderDashboard() {
           fScoresCache[stock.ticker] = await res.json();
         }
       } catch (error) {
-        console.error(`Failed to calculate F-score for ${stock.ticker}:`, error);
+        console.log(`Failed to calculate F-score for ${stock.ticker}:`, error);
       }
     }
   }
 
-  // Once all calculated, hide progress container after a small grace delay
+  // Kick off remaining stocks F-scores calculation sequentially in the background
+  calculateRemainingInBackground(remainingActive);
+
+  // Once all priority calculated, hide progress container after a small grace delay
   setTimeout(() => {
     if (fProgress) fProgress.classList.add('hidden');
   }, 1000);
@@ -734,7 +732,7 @@ async function renderDashboard() {
   
   if (twelvedataKey) {
     if (statusDot) statusDot.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
-    const tickers = stocks.map(s => s.ticker);
+    const tickers = activeList.map(s => s.ticker);
     liveData = await fetchTwelveData(tickers, twelvedataKey, daysCount);
     if (liveData && statusDot) {
       statusDot.className = "w-2 h-2 rounded-full bg-emerald-500";
@@ -746,7 +744,7 @@ async function renderDashboard() {
   }
 
   // Pre-calculate statistics
-  const processedStocks = stocks.map(stock => {
+  const processedStocks = activeList.map(stock => {
     let history = [];
     let isLive = false;
 
@@ -861,32 +859,29 @@ async function renderDashboard() {
     });
   });
 
-  // Slide Filter Selection Logic
-  // If displayMode === 'top30', restrict each of the 10 sectors to exactly its top 3 companies
-  sortedSectors.forEach(sector => {
-    if (displayMode === 'top30') {
-      sectorsMap[sector] = sectorsMap[sector].slice(0, 3);
-    }
-  });
-
   let displayedCount = 0;
 
   sortedSectors.forEach(sector => {
-    const sectorStocks = sectorsMap[sector];
-    if (sectorStocks.length === 0) return;
+    const allSectorStocks = sectorsMap[sector];
+    if (allSectorStocks.length === 0) return;
 
-    displayedCount += sectorStocks.length;
+    // Slice for display count only
+    const sectorStocksToDisplay = displayMode === 'top30'
+      ? allSectorStocks.slice(0, 3)
+      : allSectorStocks;
 
-    const sumPrices = sectorStocks.reduce((sum, s) => sum + s.lastDay.close, 0);
+    displayedCount += sectorStocksToDisplay.length;
+
+    const sumPrices = allSectorStocks.reduce((sum, s) => sum + s.lastDay.close, 0);
     let weightedHistAvg = 0;
     
     if (sumPrices > 0) {
-      weightedHistAvg = sectorStocks.reduce((sum, s) => {
+      weightedHistAvg = allSectorStocks.reduce((sum, s) => {
         const weight = s.lastDay.close / sumPrices;
         return sum + (s.latestHistVal * weight);
       }, 0);
     } else {
-      weightedHistAvg = sectorStocks.reduce((sum, s) => sum + s.latestHistVal, 0) / sectorStocks.length;
+      weightedHistAvg = allSectorStocks.reduce((sum, s) => sum + s.latestHistVal, 0) / allSectorStocks.length;
     }
 
     // Determine sector momentum
@@ -907,44 +902,99 @@ async function renderDashboard() {
     }
 
     // Calculate Sector change from beginning of timeline period
-    const totalSectorChange = sectorStocks.reduce((acc, s) => {
+    const totalSectorChange = allSectorStocks.reduce((acc, s) => {
       const startClose = s.history[s.history.length - daysCount]?.close || s.basePrice;
       const changeFromStart = ((s.lastDay.close - startClose) / startClose) * 100;
       return acc + changeFromStart;
-    }, 0) / sectorStocks.length;
+    }, 0) / allSectorStocks.length;
 
-    // Render Sector Divider Row
+    // Calculate averages of ALL companies in the sector for Volatilities & F-Score
+    const avgOneMonthVolAll = allSectorStocks.reduce((sum, s) => sum + s.oneMonthVol, 0) / allSectorStocks.length;
+    const avgOneYearVolAll = allSectorStocks.reduce((sum, s) => sum + s.oneYearVol, 0) / allSectorStocks.length;
+    const avgFScoreAll = allSectorStocks.reduce((sum, s) => sum + s.scoreVal, 0) / allSectorStocks.length;
+
+    // Calculate Sector Aggregate MACD Sparkline (from ALL sector stocks)
+    const aggregatedMacd = new Array(daysCount).fill(0);
+    const aggregatedSignal = new Array(daysCount).fill(0);
+    const aggregatedHist = new Array(daysCount).fill(0);
+
+    for (let i = 0; i < daysCount; i++) {
+      let count = 0;
+      allSectorStocks.forEach(stock => {
+        const mDisp = stock.macd;
+        const sDisp = stock.signal;
+        const hDisp = stock.hist;
+        
+        const idx = mDisp.length - daysCount + i;
+        if (idx >= 0 && idx < mDisp.length) {
+          aggregatedMacd[i] += mDisp[idx];
+          aggregatedSignal[i] += sDisp[idx];
+          aggregatedHist[i] += hDisp[idx];
+          count++;
+        }
+      });
+      if (count > 0) {
+        aggregatedMacd[i] /= count;
+        aggregatedSignal[i] /= count;
+        aggregatedHist[i] /= count;
+      }
+    }
+    const sectorMacdSparkline = renderMACDSparkline(aggregatedMacd, aggregatedSignal, aggregatedHist, daysCount);
+
+    // Render Sector Row - exactly identical size and layout columns as stock rows
     const sectorHeaderRow = document.createElement('tr');
-    sectorHeaderRow.className = "bg-zinc-900/50 font-mono text-[10px] uppercase select-none border-t border-b border-zinc-800/80";
+    sectorHeaderRow.className = "bg-zinc-900/60 hover:bg-zinc-900/70 transition-all font-mono select-none border-t border-b border-zinc-800/80 text-sm align-middle";
     const isChartExpanded = expandedSectorCharts.has(sector);
     const sectorSafeId = sector.replace(/\s+/g, '-');
-    const toggleBtnText = isChartExpanded ? 'Hide MACD Chart' : 'Show MACD Chart';
+    const toggleBtnText = isChartExpanded ? 'Hide MACD' : 'Show MACD';
     const toggleBtnClass = isChartExpanded
       ? 'text-zinc-300 border-zinc-700 bg-zinc-800/40'
       : 'text-blue-400 border-blue-500/20 bg-blue-950/10';
 
     sectorHeaderRow.innerHTML = `
-      <td colspan="8" class="py-2.5 px-6">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-2">
+      <td class="py-4 px-6 bg-zinc-900/60">
+        <div class="flex flex-col">
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded bg-blue-500"></span>
-            <span class="font-bold text-zinc-300 tracking-wider">${sector}</span>
-            <span class="text-[9px] text-zinc-500 font-normal">(${sectorStocks.length} Stock${sectorStocks.length > 1 ? 's' : ''})</span>
-            <span class="text-zinc-400 ml-2">Index Change:</span>
-            <span class="font-bold font-mono ${totalSectorChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
-              ${totalSectorChange >= 0 ? '+' : ''}${totalSectorChange.toFixed(2)}%
-            </span>
-            <button class="toggle-sector-chart-btn hover:text-white text-[9px] font-semibold border px-2 py-0.5 rounded cursor-pointer transition-all ml-2 font-mono select-none ${toggleBtnClass}" data-sector="${sector}" id="toggle-btn-${sectorSafeId}">
-              ${toggleBtnText}
-            </button>
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+            <span class="font-bold text-white tracking-wider text-sm">${sector}</span>
           </div>
-          <div class="flex items-center gap-2 text-zinc-500">
-            <span>Agg MACD Mom:</span>
-            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] ${trendClass}">
-              ${weightedHistAvg >= 0 ? '+' : ''}${weightedHistAvg.toFixed(4)} • ${trendText}
-            </span>
-          </div>
+          <span class="text-xs text-zinc-400 font-medium">${allSectorStocks.length} Stock${allSectorStocks.length > 1 ? 's' : ''}</span>
         </div>
+      </td>
+      <td class="py-4 px-4 text-right bg-zinc-900/60">
+        <div class="flex flex-col items-end">
+          <span class="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">Sector Chg</span>
+          <span class="text-xs font-mono flex items-center gap-0.5 ${totalSectorChange >= 0 ? 'text-emerald-500' : 'text-rose-500'} font-bold">
+            ${totalSectorChange >= 0 ? '+' : ''}${totalSectorChange.toFixed(2)}%
+          </span>
+        </div>
+      </td>
+      <td class="py-4 px-4 text-center bg-zinc-900/60 font-mono text-zinc-600">—</td>
+      <td class="py-4 px-4 text-center bg-zinc-900/60">
+        <div class="inline-block py-1">
+          ${sectorMacdSparkline}
+        </div>
+      </td>
+      <td class="py-4 px-4 text-center bg-zinc-900/60">
+        <div class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono select-none ${trendClass}">
+          <span>${weightedHistAvg >= 0 ? '+' : ''}${weightedHistAvg.toFixed(4)} • ${trendText}</span>
+        </div>
+      </td>
+      <td class="py-4 px-4 text-center bg-zinc-900/60">
+        <div class="inline-flex items-center justify-center bg-zinc-950 px-2.5 py-1.5 rounded border border-zinc-800 text-xs font-mono text-zinc-400">
+          Avg F: <span class="text-zinc-200 font-black ml-1">${avgFScoreAll.toFixed(1)}/9</span>
+        </div>
+      </td>
+      <td class="py-4 px-4 text-center bg-zinc-900/60">
+        <div class="flex flex-col items-center justify-center">
+          <span class="font-mono text-xs font-bold text-white">${avgOneMonthVolAll.toFixed(1)}% <span class="text-[9px] text-zinc-500 font-normal">1M</span></span>
+          <span class="font-mono text-[10px] text-zinc-400">${avgOneYearVolAll.toFixed(1)}% <span class="text-[9px] text-zinc-500 font-normal">1Y</span></span>
+        </div>
+      </td>
+      <td class="py-4 px-6 text-center bg-zinc-900/60">
+        <button class="toggle-sector-chart-btn text-[10px] font-mono px-3 py-1.5 border rounded-lg transition-all cursor-pointer whitespace-nowrap font-bold uppercase tracking-wider ${toggleBtnClass}" data-sector="${sector}" id="toggle-btn-${sectorSafeId}">
+          ${toggleBtnText}
+        </button>
       </td>
     `;
     container.appendChild(sectorHeaderRow);
@@ -953,7 +1003,7 @@ async function renderDashboard() {
     const sectorChartRow = document.createElement('tr');
     sectorChartRow.id = `sector-chart-row-${sectorSafeId}`;
     sectorChartRow.className = isChartExpanded ? "bg-zinc-950/30 border-b border-zinc-800/40" : "bg-zinc-950/30 border-b border-zinc-800/40 hidden";
-    const chartSvg = renderSectorMACDChart(sectorStocks, daysCount);
+    const chartSvg = renderSectorMACDChart(allSectorStocks, daysCount);
     
     sectorChartRow.innerHTML = `
       <td colspan="8" class="py-3 px-6">
@@ -974,7 +1024,7 @@ async function renderDashboard() {
     container.appendChild(sectorChartRow);
 
     // Render individual Stock Rows
-    sectorStocks.forEach(stock => {
+    sectorStocksToDisplay.forEach(stock => {
       const row = document.createElement('tr');
       row.className = "hover:bg-zinc-900/40 transition-all border-b border-zinc-800/40 text-sm align-middle";
       row.id = `stock-row-${stock.ticker}`;
@@ -1074,13 +1124,13 @@ async function renderDashboard() {
         const isHidden = chartRow.classList.contains('hidden');
         if (isHidden) {
           chartRow.classList.remove('hidden');
-          btn.textContent = 'Hide MACD Chart';
-          btn.className = 'toggle-sector-chart-btn hover:text-white text-[9px] font-semibold border px-2 py-0.5 rounded cursor-pointer transition-all ml-2 font-mono select-none text-zinc-300 border-zinc-700 bg-zinc-800/40';
+          btn.textContent = 'Hide MACD';
+          btn.className = 'toggle-sector-chart-btn text-[10px] font-mono px-3 py-1.5 border rounded-lg transition-all cursor-pointer whitespace-nowrap font-bold uppercase tracking-wider text-zinc-300 border-zinc-700 bg-zinc-800/40';
           expandedSectorCharts.add(sector);
         } else {
           chartRow.classList.add('hidden');
-          btn.textContent = 'Show MACD Chart';
-          btn.className = 'toggle-sector-chart-btn hover:text-white text-[9px] font-semibold border px-2 py-0.5 rounded cursor-pointer transition-all ml-2 font-mono select-none text-blue-400 border-blue-500/20 bg-blue-950/10';
+          btn.textContent = 'Show MACD';
+          btn.className = 'toggle-sector-chart-btn text-[10px] font-mono px-3 py-1.5 border rounded-lg transition-all cursor-pointer whitespace-nowrap font-bold uppercase tracking-wider text-blue-400 border-blue-500/20 bg-blue-950/10';
           expandedSectorCharts.delete(sector);
         }
       }
@@ -1089,6 +1139,9 @@ async function renderDashboard() {
 
   // Load brief analysis
   loadLLMStrategicSummary(processedStocks);
+
+  // Auto-run backtest right after calculations have completed
+  runInvestBacktest(true);
 }
 
 // Pool Toggle Membership
@@ -1097,8 +1150,8 @@ function togglePoolMembership(ticker) {
   if (index >= 0) {
     investPool.splice(index, 1);
   } else {
-    if (investPool.length >= 20) {
-      alert('Simulation basket is capped at 20 stocks maximum. Please remove a stock from the Invest tab pool first.');
+    if (investPool.length >= 30) {
+      alert('Simulation basket is capped at 30 stocks maximum. Please remove a stock from the Invest tab pool first.');
       return;
     }
     investPool.push(ticker);
@@ -1115,11 +1168,11 @@ function renderPool() {
   if (!container) return;
   container.innerHTML = '';
   
-  if (countBadge) countBadge.textContent = `${investPool.length} / 20`;
+  if (countBadge) countBadge.textContent = `${investPool.length} / 30`;
 
   if (investPool.length === 0) {
     container.innerHTML = `
-      <span class="text-xs text-zinc-500 font-mono italic">No stocks added to the pool yet. Go to the OVERVIEW tab to build your custom pool of up to 20 stocks.</span>
+      <span class="text-xs text-zinc-500 font-mono italic">No stocks added to the pool yet. Go to the OVERVIEW tab to build your custom pool of up to 30 stocks.</span>
     `;
     return;
   }
@@ -1145,6 +1198,30 @@ function renderPool() {
 
 // F-Score Progressive Async Fetchers
 let fScoresCache = {};
+let pendingBackgroundFetches = new Set();
+
+async function calculateRemainingInBackground(remainingList) {
+  for (const stock of remainingList) {
+    if (fScoresCache[stock.ticker] || pendingBackgroundFetches.has(stock.ticker)) {
+      continue;
+    }
+    pendingBackgroundFetches.add(stock.ticker);
+    try {
+      const res = await fetch(`/api/fscore?ticker=${stock.ticker}`);
+      if (res.ok) {
+        const data = await res.json();
+        fScoresCache[stock.ticker] = data;
+        updateFScoreCell(stock.ticker, data);
+      }
+    } catch (e) {
+      console.log(`Background F-score skip: ${stock.ticker}`);
+    } finally {
+      pendingBackgroundFetches.delete(stock.ticker);
+    }
+    // Stagger sequential background loading by 100ms
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
 
 async function fetchFScore(ticker) {
   try {
@@ -1409,28 +1486,8 @@ function renderSectorMACDChart(sectorStocks, displayDays) {
     const yStart = isPositive ? yHist : zeroY;
     const hBar = Math.max(Math.abs(zeroY - yHist), 1);
     
-    svgs += `<rect x="${x - barWidth / 2}" y="${yStart}" width="${barWidth}" height="${hBar}" fill="${barColor}" fill-opacity="0.25" rx="0.5" />`;
+    svgs += `<rect x="${x - barWidth / 2}" y="${yStart}" width="${barWidth}" height="${hBar}" fill="${barColor}" fill-opacity="0.65" rx="0.5" />`;
   }
-  
-  let macdPath = '';
-  let signalPath = '';
-  
-  for (let i = 0; i < n; i++) {
-    const x = padding + i * colWidth + colWidth / 2;
-    const yM = scaleY(aggregatedMacd[i]);
-    const yS = scaleY(aggregatedSignal[i]);
-    
-    if (i === 0) {
-      macdPath += `M ${x} ${yM}`;
-      signalPath += `M ${x} ${yS}`;
-    } else {
-      macdPath += ` L ${x} ${yM}`;
-      signalPath += ` L ${x} ${yS}`;
-    }
-  }
-  
-  svgs += `<path d="${macdPath}" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" />`;
-  svgs += `<path d="${signalPath}" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" />`;
   
   svgs += `</svg></div>`;
   return svgs;
@@ -1490,14 +1547,18 @@ async function loadLLMStrategicSummary(processedStocks) {
 
 // Setup Backtest simulation engine
 // Implements 1% p.a. idle cash interest, 1.5% dividend yield, max 10 holding positions, max 2 stocks per sector
-function runInvestBacktest() {
+function runInvestBacktest(isAuto = false) {
   if (!csvHistoryData) {
-    alert('S&P 100 historical database is still loading. Please wait a second and retry!');
+    if (!isAuto) {
+      alert('S&P 100 historical database is still loading. Please wait a second and retry!');
+    }
     return;
   }
 
   if (investPool.length === 0) {
-    alert('Please choose at least one stock to build your simulation pool basket!');
+    if (!isAuto) {
+      alert('Please choose at least one stock to build your simulation pool basket!');
+    }
     return;
   }
 
@@ -1509,7 +1570,9 @@ function runInvestBacktest() {
   const endDateStr = targetDate;
 
   if (startDateStr >= endDateStr) {
-    alert('Simulation start date must be strictly prior to the synced target end date!');
+    if (!isAuto) {
+      alert('Simulation start date must be strictly prior to the synced target end date!');
+    }
     return;
   }
 
@@ -1946,12 +2009,7 @@ async function initializeApp() {
   dateInput.value = targetDate;
 
   // Initialize manual start date for dashboard
-  const defaultManualStart = new Date('2026-09-01');
-  defaultManualStart.setDate(defaultManualStart.getDate() - 30);
-  const mYear = defaultManualStart.getFullYear();
-  const mMonth = String(defaultManualStart.getMonth() + 1).padStart(2, '0');
-  const mDay = String(defaultManualStart.getDate()).padStart(2, '0');
-  manualStartDate = `${mYear}-${mMonth}-${mDay}`;
+  manualStartDate = '2026-01-01';
   
   const manualDateInput = document.getElementById('manual-start-date');
   if (manualDateInput) {
