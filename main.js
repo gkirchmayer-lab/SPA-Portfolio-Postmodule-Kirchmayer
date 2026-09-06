@@ -683,20 +683,22 @@ async function renderDashboard() {
   const big30Active = stocks.filter(s => BIG_30_TICKERS.includes(s.ticker));
   const remainingActive = stocks.filter(s => !BIG_30_TICKERS.includes(s.ticker));
 
-  for (let i = 0; i < big30Active.length; i++) {
-    const stock = big30Active[i];
-    const pct = Math.round(((i + 1) / big30Active.length) * 100);
-    
-    const pBar = document.getElementById('fscore-progress-bar');
-    const pTxt = document.getElementById('fscore-progress-text');
-    const innerBar = document.getElementById('loading-inner-bar');
-    const statusSpan = document.getElementById('calculating-fscores-status');
-    
+  const pBar = document.getElementById('fscore-progress-bar');
+  const pTxt = document.getElementById('fscore-progress-text');
+  const innerBar = document.getElementById('loading-inner-bar');
+  const statusSpan = document.getElementById('calculating-fscores-status');
+
+  let completedCount = 0;
+  const updateProgress = (ticker) => {
+    completedCount++;
+    const pct = Math.round((completedCount / big30Active.length) * 100);
     if (pBar) pBar.style.width = `${pct}%`;
-    if (pTxt) pTxt.textContent = `${pct}% (${i + 1}/${big30Active.length})`;
+    if (pTxt) pTxt.textContent = `${pct}% (${completedCount}/${big30Active.length})`;
     if (innerBar) innerBar.style.width = `${pct}%`;
-    if (statusSpan) statusSpan.textContent = `Analyzing priority roster: ${stock.ticker} (${i + 1} of ${big30Active.length})`;
-    
+    if (statusSpan) statusSpan.textContent = `Analyzing priority roster: ${ticker} (${completedCount} of ${big30Active.length})`;
+  };
+
+  const fetchPromises = big30Active.map(async (stock) => {
     if (!fScoresCache[stock.ticker]) {
       try {
         const res = await fetch(`/api/fscore?ticker=${stock.ticker}`);
@@ -707,7 +709,10 @@ async function renderDashboard() {
         console.log(`Failed to calculate F-score for ${stock.ticker}:`, error);
       }
     }
-  }
+    updateProgress(stock.ticker);
+  });
+
+  await Promise.all(fetchPromises);
 
   // Kick off remaining stocks F-scores calculation sequentially in the background
   calculateRemainingInBackground(remainingActive);
@@ -1611,6 +1616,7 @@ function runInvestBacktest(isAuto = false) {
   let positions = []; // Elements: { ticker, sector, shares, buyPrice, buyDate, currentPrice }
   const equityTimeline = []; // Chart path elements: { date, portfolio, sp100, sp500 }
   const tradeStats = {}; // Tracks: { ticker, name, sector, tradesCount, totalCapitalInvested, totalProceedsRealized, isActive }
+  const tradeEvents = []; // Capture trades for chart visualization
 
   // Loop over every trading day
   activeDates.forEach((currentDate, dayIdx) => {
@@ -1645,6 +1651,8 @@ function runInvestBacktest(isAuto = false) {
           // Liquidate complete position at today's close
           const proceeds = pos.shares * todayQuote.close;
           freeCash += proceeds;
+
+          tradeEvents.push({ date: currentDate, ticker: pos.ticker, type: 'SELL', price: todayQuote.close, shares: pos.shares });
 
           if (!tradeStats[pos.ticker]) {
             tradeStats[pos.ticker] = { ticker: pos.ticker, name: csvCompanyNames[pos.ticker] || pos.ticker, sector: pos.sector, tradesCount: 0, totalCapitalInvested: 0, totalProceedsRealized: 0 };
@@ -1710,6 +1718,8 @@ function runInvestBacktest(isAuto = false) {
           currentPrice: candidate.closePrice
         });
 
+        tradeEvents.push({ date: currentDate, ticker: candidate.ticker, type: 'BUY', price: candidate.closePrice, shares: sharesToBuy });
+
         freeCash -= allocation;
 
         if (!tradeStats[candidate.ticker]) {
@@ -1728,14 +1738,17 @@ function runInvestBacktest(isAuto = false) {
     const sp100Ratio = getBenchmarkPriceRatio(currentDate, startDateStr);
     const daySp100Val = startVal * sp100Ratio;
 
-    // S&P 500 return tracking average market standard
-    const daySp500Val = startVal * (1 + (sp100Ratio - 1) * 0.93 + (dayIdx * 0.00015)); // realistically slight lag with drift
+    const activePositionsOnDay = {};
+    positions.forEach(p => {
+      activePositionsOnDay[p.ticker] = p.shares * p.currentPrice;
+    });
 
     equityTimeline.push({
       date: currentDate,
       portfolio: dayTotalPortfolioEquity,
+      capitalEmployed: activePositionEquity,
       sp100: daySp100Val,
-      sp500: daySp500Val
+      holdings: activePositionsOnDay
     });
   });
 
@@ -1753,9 +1766,6 @@ function runInvestBacktest(isAuto = false) {
 
   const sp100RatioFinal = getBenchmarkPriceRatio(endDateStr, startDateStr);
   const sp100ReturnFinal = (sp100RatioFinal - 1) * 100;
-  
-  const sp500RatioFinal = (1 + (sp100RatioFinal - 1) * 0.93 + (activeDates.length * 0.00015));
-  const sp500ReturnFinal = (sp500RatioFinal - 1) * 100;
 
   // Render Display Metric Cards
   document.getElementById('res-init-val').textContent = `$${startVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -1770,13 +1780,15 @@ function runInvestBacktest(isAuto = false) {
   }
 
   document.getElementById('res-benchmarks').innerHTML = `S&P 100: <span class="${sp100ReturnFinal >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-bold">${sp100ReturnFinal >= 0 ? '+' : ''}${sp100ReturnFinal.toFixed(2)}%</span>`;
-  document.getElementById('res-benchmark-500').innerHTML = `S&P 500: <span class="${sp500ReturnFinal >= 0 ? 'text-amber-500' : 'text-rose-400'} font-semibold">${sp500ReturnFinal >= 0 ? '+' : ''}${sp500ReturnFinal.toFixed(2)}%</span>`;
 
   // Draw Line Chart
-  renderBacktestEquityChart(equityTimeline);
+  renderBacktestEquityChart(equityTimeline, tradeEvents);
 
   // Render Table Breakdown of Stock Earnings
   renderBacktestTable(tradeStats, positions);
+
+  // Trigger AI Intelligence Briefing
+  loadLLMPortfolioBriefing(equityTimeline, tradeStats, startDateStr, endDateStr, startVal, finalVal, roiVal, sp100ReturnFinal);
 }
 
 // Get average price return ratio of active S&P 100 registry companies on dateVal compared to startDateStr
@@ -1802,99 +1814,279 @@ function getBenchmarkPriceRatio(dateVal, startDateStr) {
   return count > 0 ? (cumulativeRatio / count) : 1.0;
 }
 
-// Draw backtesting interactive growth curve comparison in SVG
-function renderBacktestEquityChart(timeline) {
+// Draw backtesting interactive growth curve comparison in SVG (widescreen with active stock holding segment tracks)
+function renderBacktestEquityChart(timeline, tradeEvents) {
   const container = document.getElementById('equity-chart-container');
   if (!container) return;
   container.innerHTML = '';
 
-  const width = container.clientWidth || 680;
-  const height = 176;
-  const paddingLeft = 46;
-  const paddingRight = 10;
-  const paddingTop = 12;
-  const paddingBottom = 20;
+  const width = container.clientWidth || 980;
+  const height = 400; // Large 400px high visualization
+  const paddingLeft = 52;
+  const paddingRight = 64; // Padding for labels on the right side
+  const paddingTop = 20;
+  const paddingBottom = 25;
 
   const portVals = timeline.map(t => t.portfolio);
   const sp100Vals = timeline.map(t => t.sp100);
-  const sp500Vals = timeline.map(t => t.sp500);
+  const capEmpVals = timeline.map(t => t.capitalEmployed || 0);
 
-  const allVals = [...portVals, ...sp100Vals, ...sp500Vals];
-  const maxVal = Math.max(...allVals) * 1.02;
-  const minVal = Math.min(...allVals) * 0.98;
-  const range = maxVal - minVal || 1;
+  // Collect all left-axis values to compute max Left
+  const leftVals = [...portVals, ...sp100Vals];
+
+  const tradesByTicker = {};
+  tradeEvents.forEach(e => {
+    if (!tradesByTicker[e.ticker]) tradesByTicker[e.ticker] = [];
+    tradesByTicker[e.ticker].push(e);
+  });
+
+  const dateToIndex = {};
+  timeline.forEach((day, idx) => dateToIndex[day.date] = idx);
+
+  Object.entries(tradesByTicker).forEach(([ticker, trades]) => {
+    trades.sort((a, b) => new Date(a.date) - new Date(b.date));
+    for (let i = 0; i < trades.length; i += 2) {
+      const buy = trades[i];
+      const sell = trades[i + 1];
+      if (!buy) continue;
+
+      const idxBuy = dateToIndex[buy.date];
+      const idxSell = sell ? dateToIndex[sell.date] : timeline.length - 1;
+      if (idxBuy === undefined) continue;
+
+      const portfolioAtBuy = timeline[idxBuy].portfolio;
+      const shares = buy.shares;
+      const initialStockValue = shares * buy.price;
+
+      for (let dayIdx = idxBuy; dayIdx <= idxSell; dayIdx++) {
+        const stockValueAtDay = timeline[dayIdx].holdings[buy.ticker] || 0;
+        const yValue = portfolioAtBuy + (stockValueAtDay - initialStockValue);
+        leftVals.push(yValue);
+      }
+    }
+  });
+
+  // Create a fast lookup for stock closing prices to calculate actual held-stock trajectory
+  const poolPriceByDate = {};
+  Object.keys(tradesByTicker).forEach(ticker => {
+    poolPriceByDate[ticker] = {};
+    const history = csvHistoryData?.[ticker] || [];
+    history.forEach(h => {
+      poolPriceByDate[ticker][h.date] = h.close;
+    });
+  });
+
+  // Left axis minimum is 85% of the least value of total equity, maximum is 115% of the highest value of total equity
+  const minP = portVals.length > 0 ? portVals.reduce((min, val) => val < min ? val : min, portVals[0]) : 1000;
+  const maxP = portVals.length > 0 ? portVals.reduce((max, val) => val > max ? val : max, portVals[0]) : 1000;
+  const minValLeft = Math.max(0, minP * 0.85);
+  const maxValLeft = maxP * 1.15;
+
+  // Right axis from 0 to max fully used
+  const peakRight = capEmpVals.length > 0 ? capEmpVals.reduce((max, val) => val > max ? val : max, capEmpVals[0]) : 1000;
+  const maxValRight = Math.max(peakRight, 1000) * 1.02; // Tiny margin to avoid drawing lines right on the top boundary
+  const minValRight = 0;
 
   const scaleX = (idx) => {
     return paddingLeft + (idx / (timeline.length - 1)) * (width - paddingLeft - paddingRight);
   };
 
-  const scaleY = (val) => {
-    return height - paddingBottom - ((val - minVal) / range) * (height - paddingTop - paddingBottom);
+  const scaleY_Left = (val) => {
+    const range = maxValLeft - minValLeft || 1;
+    return height - paddingBottom - ((val - minValLeft) / range) * (height - paddingTop - paddingBottom);
   };
 
-  let svgs = `<svg width="${width}" height="${height}" class="overflow-visible">`;
+  const scaleY_Right = (val) => {
+    const range = maxValRight - minValRight || 1;
+    return height - paddingBottom - ((val - minValRight) / range) * (height - paddingTop - paddingBottom);
+  };
 
-  // Draw subtle horizontal grid lines
-  const gridSteps = 4;
+  let svgs = `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" class="overflow-visible select-none">`;
+
+  // Draw subtle horizontal grid lines with absolute price tags on both Left and Right axes
+  const gridSteps = 5;
   for (let i = 0; i <= gridSteps; i++) {
-    const gridYValue = minVal + (range / gridSteps) * i;
-    const y = scaleY(gridYValue);
+    const gridYValueLeft = minValLeft + ((maxValLeft - minValLeft) / gridSteps) * i;
+    const y = scaleY_Left(gridYValueLeft);
     svgs += `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="#1f1f23" stroke-width="1" />`;
-    svgs += `<text x="5" y="${y + 3}" fill="#71717a" class="text-[8px] font-mono">$${Math.round(gridYValue).toLocaleString()}</text>`;
+    // Left axis tags (Blue for Portfolio / S&P 100)
+    svgs += `<text x="5" y="${y + 3}" fill="#3b82f6" class="text-[9px] font-mono font-medium">$${Math.round(gridYValueLeft).toLocaleString()}</text>`;
+    
+    // Right axis tags (Muted light grey for Capital Employed)
+    const gridYValueRight = minValRight + ((maxValRight - minValRight) / gridSteps) * i;
+    svgs += `<text x="${width - paddingRight + 8}" y="${y + 3}" fill="#71717a" class="text-[9px] font-mono font-medium">$${Math.round(gridYValueRight).toLocaleString()}</text>`;
   }
 
-  // Generate paths
+  // Generate paths for S&P 100, Total Portfolio, and Capital Employed
   let portfolioPath = '';
   let sp100Path = '';
-  let sp500Path = '';
-
-  let portfolioAreaPath = `M ${scaleX(0)} ${scaleY(minVal)}`;
+  let capitalEmployedPath = '';
+  let portfolioAreaPath = `M ${scaleX(0)} ${scaleY_Left(minValLeft)}`;
 
   timeline.forEach((day, idx) => {
     const x = scaleX(idx);
-    const yP = scaleY(day.portfolio);
-    const y100 = scaleY(day.sp100);
-    const y500 = scaleY(day.sp500);
+    const yP = scaleY_Left(day.portfolio);
+    const y100 = scaleY_Left(day.sp100);
+    const yCap = scaleY_Right(day.capitalEmployed || 0);
 
     if (idx === 0) {
       portfolioPath += `M ${x} ${yP}`;
       sp100Path += `M ${x} ${y100}`;
-      sp500Path += `M ${x} ${y500}`;
+      capitalEmployedPath += `M ${x} ${yCap}`;
     } else {
       portfolioPath += ` L ${x} ${yP}`;
       sp100Path += ` L ${x} ${y100}`;
-      sp500Path += ` L ${x} ${y500}`;
+      capitalEmployedPath += ` L ${x} ${yCap}`;
     }
     
     portfolioAreaPath += ` L ${x} ${yP}`;
   });
 
-  portfolioAreaPath += ` L ${scaleX(timeline.length - 1)} ${scaleY(minVal)} Z`;
+  portfolioAreaPath += ` L ${scaleX(timeline.length - 1)} ${scaleY_Left(minValLeft)} Z`;
 
-  // Plot Area fill
-  svgs += `<path d="${portfolioAreaPath}" fill="#3b82f6" fill-opacity="0.06" />`;
+  // Plot Total Equity Area fill (Left axis)
+  svgs += `<path d="${portfolioAreaPath}" fill="#3b82f6" fill-opacity="0.04" />`;
 
-  // Plot Lines
-  svgs += `<path d="${portfolioPath}" fill="none" stroke="#3b82f6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />`;
-  svgs += `<path d="${sp100Path}" fill="none" stroke="#71717a" stroke-width="1.25" stroke-dasharray="3,3" stroke-linecap="round" />`;
-  svgs += `<path d="${sp500Path}" fill="none" stroke="#d97706" stroke-width="1.25" stroke-dasharray="3,3" stroke-linecap="round" />`;
+  // Plot Benchmark S&P 100 Line (Left axis, dashed)
+  svgs += `<path d="${sp100Path}" fill="none" stroke="#52525b" stroke-width="1.2" stroke-dasharray="3,3" stroke-linecap="round" />`;
+
+  // Plot Individual Stock Trade Paths (Left axis, anchored to Portfolio Total at buy date to show contribution)
+  Object.entries(tradesByTicker).forEach(([ticker, trades]) => {
+    // Draw lines and dots
+    for (let i = 0; i < trades.length; i += 2) {
+      const buy = trades[i];
+      const sell = trades[i + 1];
+      if (!buy) continue;
+
+      const idxBuy = dateToIndex[buy.date];
+      const idxSell = sell ? dateToIndex[sell.date] : timeline.length - 1;
+      if (idxBuy === undefined) continue;
+
+      const portfolioAtBuy = timeline[idxBuy].portfolio;
+      const shares = buy.shares;
+      const initialStockValue = shares * buy.price;
+
+      // Calculate actual final value based on physical stock price at exit day, completely removing downward hockey sticks
+      const sellDate = timeline[idxSell].date;
+      const sellPrice = poolPriceByDate[buy.ticker]?.[sellDate] || buy.price;
+      const finalStockValue = shares * sellPrice;
+      const isProfit = finalStockValue >= initialStockValue;
+      const pathColor = isProfit ? '#22c55e' : '#ef4444';
+
+      let stockPath = '';
+      for (let dayIdx = idxBuy; dayIdx <= idxSell; dayIdx++) {
+        const x = scaleX(dayIdx);
+        // Calculate stock value at this specific day based on actual historic prices
+        const dayDate = timeline[dayIdx].date;
+        const dayPrice = poolPriceByDate[buy.ticker]?.[dayDate] || buy.price;
+        const stockValueAtDay = shares * dayPrice;
+        const yValue = portfolioAtBuy + (stockValueAtDay - initialStockValue);
+        const y = scaleY_Left(yValue);
+        
+        if (dayIdx === idxBuy) stockPath += `M ${x} ${y}`;
+        else stockPath += ` L ${x} ${y}`;
+        
+        // Save midpoint for label
+        if (dayIdx === Math.floor((idxBuy + idxSell) / 2)) {
+          svgs += `<text x="${x}" y="${y - 10}" fill="${pathColor}" class="text-[9px] font-mono font-bold" text-anchor="middle" filter="drop-shadow(0px 1px 1px rgba(0,0,0,0.5))">${buy.ticker}</text>`;
+        }
+      }
+      
+      // Draw stock path (dashed line, Left axis)
+      svgs += `<path d="${stockPath}" fill="none" stroke="${pathColor}" stroke-width="1.2" stroke-dasharray="2,2" />`;
+      
+      // Buy dot on the stock path (Left axis)
+      const yBuyDot = scaleY_Left(portfolioAtBuy);
+      svgs += `<circle cx="${scaleX(idxBuy)}" cy="${yBuyDot}" r="3.5" fill="#22c55e" stroke="#000" stroke-width="1" />`;
+      
+      // Sell dot on the stock path (Left axis)
+      if (sell) {
+        const finalYValue = portfolioAtBuy + (finalStockValue - initialStockValue);
+        const ySellDot = scaleY_Left(finalYValue);
+        svgs += `<circle cx="${scaleX(idxSell)}" cy="${ySellDot}" r="3.5" fill="#ef4444" stroke="#000" stroke-width="1" />`;
+      }
+    }
+  });
+
+  // Plot Capital Employed line (Right axis - light grey, thin, and less dominant)
+  svgs += `<path d="${capitalEmployedPath}" fill="none" stroke="#52525b" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />`;
+
+  // Plot Total Portfolio Equity (Left axis, highest layer for peak visibility)
+  svgs += `<path d="${portfolioPath}" fill="none" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />`;
 
   // Render Date Labels
-  const labelSteps = 4;
+  const labelSteps = 6;
   for (let i = 0; i < labelSteps; i++) {
     const idx = Math.floor((timeline.length - 1) * (i / (labelSteps - 1)));
     const day = timeline[idx];
     if (day) {
       const x = scaleX(idx);
-      // Format YYYY-MM-DD to short display MM/DD
       const dateParts = day.date.split('-');
       const label = `${dateParts[1]}/${dateParts[2]}`;
-      svgs += `<text x="${x}" y="${height - 5}" fill="#52525b" class="text-[8px] font-mono text-center" text-anchor="middle">${label}</text>`;
+      svgs += `<text x="${x}" y="${height - 5}" fill="#52525b" class="text-[9px] font-mono text-center" text-anchor="middle">${label}</text>`;
     }
   }
 
   svgs += `</svg>`;
   container.innerHTML = svgs;
+}
+
+// Fetch and render AI Strategic Portfolio Briefing from the server
+function loadLLMPortfolioBriefing(timeline, tradeStats, startDate, endDate, startVal, finalVal, roiVal, sp100ReturnFinal) {
+  const contentDiv = document.getElementById('portfolio-briefing-content');
+  if (!contentDiv) return;
+
+  contentDiv.innerHTML = `
+    <div class="flex items-center justify-center py-8 text-zinc-500 gap-2.5">
+      <svg class="w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <span class="font-mono text-[10px] uppercase tracking-wider animate-pulse text-zinc-400">Synthesizing AI Strategic Portfolio Briefing...</span>
+    </div>
+  `;
+
+  // Compile individual stock performance contributions
+  const tickerBreakdown = Object.values(tradeStats).map(item => {
+    const netReturn = item.totalProceedsRealized - item.totalCapitalInvested;
+    const roi = item.totalCapitalInvested > 0 ? (netReturn / item.totalCapitalInvested) * 100 : 0.0;
+    return {
+      ticker: item.ticker,
+      tradesCount: item.tradesCount || 1,
+      totalCapitalInvested: item.totalCapitalInvested,
+      netReturn: netReturn,
+      roi: roi
+    };
+  });
+
+  fetch('/api/portfolio-summary', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      startDate,
+      endDate,
+      initialCapital: startVal,
+      finalCapital: finalVal,
+      netReturn: finalVal - startVal,
+      roi: roiVal,
+      sp100Return: sp100ReturnFinal,
+      tickerBreakdown,
+      openrouterKey: openrouterKey
+    })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('API return is offline');
+    return res.json();
+  })
+  .then(data => {
+    contentDiv.innerHTML = data.summary;
+  })
+  .catch(err => {
+    console.error('Failed to formulate AI portfolio briefing:', err);
+    contentDiv.innerHTML = `<p class="text-rose-400 font-mono text-xs">Offline: Error formulating strategic briefing. Recalibrate and relaunch simulation.</p>`;
+  });
 }
 
 // Render simulation outcome list per stock
@@ -2107,6 +2299,9 @@ async function initializeApp() {
     renderDashboard();
   });
 
+  // CSV Download
+  document.getElementById('download-csv-btn').addEventListener('click', downloadConstituentsCSV);
+
   // API Drawer controls
   const toggleApiBtn = document.getElementById('toggle-api-btn');
   const apiDrawer = document.getElementById('api-drawer');
@@ -2239,3 +2434,27 @@ async function initializeApp() {
 
 // Run station init
 document.addEventListener('DOMContentLoaded', initializeApp);
+
+function downloadConstituentsCSV() {
+  if (!stocks || stocks.length === 0) return;
+
+  const headers = ['Ticker', 'Name', 'Sector', 'Current Price', 'Piotroski F-Score'];
+  const rows = stocks.map(s => [
+    s.ticker,
+    `"${(s.name || '').replace(/"/g, '""')}"`,
+    s.sector || 'N/A',
+    s.currentPrice || 'N/A',
+    s.fScore !== undefined ? s.fScore : 'N/A'
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `sp100_constituents_${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}

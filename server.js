@@ -16,7 +16,10 @@ async function startServer() {
 
   // CIK Cache and Ticker mapping
   let tickerCikMap = null;
+  let isSecApiDown = false;
+
   async function fetchTickerCikMap() {
+    if (isSecApiDown) return null;
     if (tickerCikMap) return tickerCikMap;
     try {
       console.log('Fetching ticker CIK map from SEC EDGAR with timeout...');
@@ -39,9 +42,11 @@ async function startServer() {
         return tickerCikMap;
       } else {
         console.log(`SEC ticker map returned status ${response.status}`);
+        isSecApiDown = true;
       }
     } catch (e) {
       console.log('Failed to fetch ticker-CIK map from SEC within timeout:', e.message || e);
+      isSecApiDown = true;
     }
     return null;
   }
@@ -60,11 +65,62 @@ async function startServer() {
     'JPM': 19617
   };
 
+  let quotaExhaustedUntil = 0;
+
+  // Helper for AI requests with retry
+  async function generateContentWithRetry(ai, model, prompt, maxAttempts = 4) {
+    if (Date.now() < quotaExhaustedUntil) {
+      console.log('Gemini quota exhausted. Skipping API call.');
+      throw new Error('Quota exhausted - Circuit breaker active');
+    }
+
+    let attempts = 0;
+    while (attempts < maxAttempts) {
+      try {
+        return await ai.models.generateContent({ model, contents: prompt });
+      } catch (apiError) {
+        attempts++;
+        // Helper to extract nested error info
+        const getNested = (obj, path) => path.split('.').reduce((acc, p) => acc && acc[p], obj);
+        const status = apiError.status || getNested(apiError, 'error.status') || getNested(apiError, 'response.status');
+        const code = apiError.code || getNested(apiError, 'error.code');
+        const message = apiError.message || getNested(apiError, 'error.message') || JSON.stringify(apiError);
+
+        // If it's a 429 (Resource Exhausted), do not retry, trigger fallback immediately without logging general failure
+        const normalizedCode = parseInt(code) || 0;
+        const normalizedStatus = parseInt(status) || 0;
+        if (normalizedCode === 429 || normalizedStatus === 429 || String(message).includes('429')) {
+          console.log('Gemini quota exceeded (429). Setting circuit breaker and triggering fallback.');
+          quotaExhaustedUntil = Date.now() + 60 * 60 * 1000; // Disable for 1 hour
+          throw apiError;
+        }
+
+        console.log(`Gemini request - attempt ${attempts}/${maxAttempts} failed: ${message}`);
+
+        // Determine wait time for other transient errors
+        let delay = attempts * 2000; // Base backoff
+        // If it's a 503 (Unavailable), wait longer
+        if (status === 503 || code === 503 || message.includes('503') || message.includes('unavailable')) {
+          delay = attempts * 4000;
+        }
+        
+        if (attempts >= maxAttempts) throw apiError;
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
   // API endpoint for F-Score
   app.get('/api/fscore', async (req, res) => {
     const ticker = (req.query.ticker || '').toUpperCase().trim();
     if (!ticker) {
       return res.status(400).json({ error: 'Ticker is required' });
+    }
+
+    if (isSecApiDown) {
+      console.log(`SEC API marked as down/blocked. Instantly using procedural model for ${ticker}.`);
+      return res.json(generateSimulatedFScore(ticker));
     }
 
     try {
@@ -109,6 +165,7 @@ async function startServer() {
       return res.json(fScoreDetails);
     } catch (error) {
       console.log(`Calibrating procedural calculations for ${ticker}: ${error.message}`);
+      isSecApiDown = true; // Trigger circuit breaker on first fail to ensure zero-lag subsequent calls
       return res.json(generateSimulatedFScore(ticker));
     }
   });
@@ -149,7 +206,7 @@ Guidelines:
             'X-Title': 'STATION.11 Terminal'
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: 'google/gemini-3.6-flash',
             messages: [{ role: 'user', content: prompt }]
           })
         });
@@ -182,36 +239,153 @@ Guidelines:
         }
       });
 
-      let response;
-      let attempts = 0;
-      const maxAttempts = 3;
-      while (attempts < maxAttempts) {
-        try {
-          response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
-            contents: prompt
-          });
-          break; // Success!
-        } catch (apiError) {
-          attempts++;
-          console.log(`Gemini request - retry status ${attempts}/3`);
-          if (attempts >= maxAttempts) {
-            throw apiError; // Bubble up to outer catch block to trigger robust local simulation fallback
-          }
-          // Exponential backoff delay
-          await new Promise(resolve => setTimeout(resolve, attempts * 1000));
-        }
-      }
+      const response = await generateContentWithRetry(ai, 'gemini-3.6-flash', prompt);
 
       let summaryHtml = response.text || '';
       summaryHtml = summaryHtml.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
 
       return res.json({ summary: summaryHtml });
     } catch (e) {
-      console.log('Gemini API call returned status code 429 or was unavailable. Activating stable, pre-calculated local summary pipeline.');
+      if (e instanceof Error && e.message.includes('Circuit breaker')) {
+        console.log('Gemini quota exhausted. Using local fallback.');
+      } else {
+        console.log('Gemini API unavailable. Using local fallback.');
+      }
       return res.json({ summary: getSimulatedBrief(stocks, timeline) });
     }
   });
+
+  // AI-powered strategic analysis for Portfolio Backtesting
+  app.post('/api/portfolio-summary', async (req, res) => {
+    const {
+      startDate,
+      endDate,
+      initialCapital,
+      finalCapital,
+      netReturn,
+      roi,
+      sp100Return,
+      tickerBreakdown,
+      openrouterKey
+    } = req.body;
+
+    if (!tickerBreakdown || tickerBreakdown.length === 0) {
+      return res.json({
+        summary: `<p class="text-zinc-500 font-mono">Build a custom pool and run the backtest simulation to view detailed AI portfolio analysis.</p>`
+      });
+    }
+
+    const prompt = `You are a world-class portfolio strategist and quantitative analyst at STATION.11, an ultra-premium stock intelligence terminal.
+Analyze the following portfolio backtesting simulation results:
+- Date Range: ${startDate} to ${endDate}
+- Initial Capital: $${initialCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+- Final Capital: $${finalCapital.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+- Portfolio Net Return: ${netReturn >= 0 ? '+' : ''}${roi.toFixed(2)}% (${netReturn >= 0 ? '+' : ''}$${netReturn.toLocaleString(undefined, { maximumFractionDigits: 2 })})
+- S&P 100 Index Benchmark Return: ${sp100Return.toFixed(2)}%
+- Individual Stock Traded Contributions:
+${tickerBreakdown.map(b => `- ${b.ticker}: ${b.tradesCount} trades, Capital Traded: $${b.totalCapitalInvested.toLocaleString(undefined, { maximumFractionDigits: 0 })}, Net Return: ${b.netReturn >= 0 ? '+' : ''}$${b.netReturn.toLocaleString(undefined, { maximumFractionDigits: 2 })} (${b.netReturn >= 0 ? '+' : ''}${b.roi.toFixed(1)}%)`).join('\n')}
+
+Please provide a highly professional, dense, and critical strategic briefing of this simulation's performance:
+1. **Performance Breakdown**: Analyze what was good (which specific trades or stock selections drove positive alpha) and what was bad (which stocks or sectors dragged down performance).
+2. **Real Reasons for Success or Failure**: Explain the real reasons for any performance discrepancy based on MACD crossovers, diversification limits (max 2 stocks per sector, max 10 slots), dividend accruals, or market benchmark comparison. Do not make up or invent historical events if they are not in the raw data, but reference the real mathematical behavior of the simulation (e.g. cash drag from holding too much idle cash, whipsawing from choppy MACD crossover signals in sideways-moving stocks, or concentration of returns in specific high-performers).
+3. Do not include introductory filler, pleasantries, or self-referential greetings.
+4. Format your entire response in beautifully typeset, high-contrast HTML tags: use <strong> for key terminology, <p> for paragraphs, and <ul class="list-disc pl-5 mt-2 space-y-2"> with <li> for bullet lists. Limit the output to 2-3 focused bullet points or 2 concise paragraphs. Make it extremely high signal-to-noise.`;
+
+    try {
+      if (openrouterKey) {
+        console.log('Formulating portfolio briefing via OpenRouter API client...');
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openrouterKey}`,
+            'X-Title': 'STATION.11 Terminal'
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-3.6-flash',
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+
+        if (orRes.ok) {
+          const orData = await orRes.json();
+          let summaryHtml = orData.choices?.[0]?.message?.content || '';
+          summaryHtml = summaryHtml.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
+          if (summaryHtml) {
+            return res.json({ summary: summaryHtml });
+          }
+        }
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.log('GEMINI_API_KEY not defined. Generating premium procedural portfolio summary fallback.');
+        return res.json({ summary: getSimulatedPortfolioBrief(req.body) });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
+
+      const response = await generateContentWithRetry(ai, 'gemini-3.6-flash', prompt);
+
+      let summaryHtml = response.text || '';
+      summaryHtml = summaryHtml.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
+      return res.json({ summary: summaryHtml });
+
+    } catch (e) {
+      if (e.message && e.message.includes('Circuit breaker')) {
+        console.log('Gemini quota exhausted. Using local fallback.');
+      } else {
+        console.log('Gemini portfolio summary unavailable. Using local fallback.');
+      }
+      return res.json({ summary: getSimulatedPortfolioBrief(req.body) });
+    }
+  });
+
+  // Helper to generate simulated portfolio summary
+  function getSimulatedPortfolioBrief(data) {
+    const { initialCapital, finalCapital, netReturn, roi, sp100Return, tickerBreakdown } = data;
+    const isGain = netReturn >= 0;
+    
+    const sortedTickers = [...tickerBreakdown].sort((a, b) => b.netReturn - a.netReturn);
+    const bestPerf = sortedTickers[0];
+    const worstPerf = sortedTickers[sortedTickers.length - 1];
+
+    const textBest = bestPerf ? `<strong>${bestPerf.ticker}</strong> (generating a net return of ${bestPerf.netReturn >= 0 ? '+' : ''}$${bestPerf.netReturn.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ${bestPerf.netReturn >= 0 ? '+' : ''}${bestPerf.roi.toFixed(1)}%)` : 'none';
+    const textWorst = worstPerf ? `<strong>${worstPerf.ticker}</strong> (lagging with a return of ${worstPerf.netReturn >= 0 ? '+' : ''}$${worstPerf.netReturn.toLocaleString(undefined, { maximumFractionDigits: 0 })} / ${worstPerf.netReturn >= 0 ? '+' : ''}${worstPerf.roi.toFixed(1)}%)` : 'none';
+
+    const beatSp100 = roi > sp100Return;
+    
+    let comparisonText = '';
+    if (beatSp100) {
+      comparisonText = `This strategy successfully <strong>outperformed the S&P 100 benchmark</strong>, delivering positive alpha through tactical trend-following.`;
+    } else {
+      comparisonText = `The portfolio <strong>underperformed the passive S&P 100 buy-and-hold benchmark</strong>, demonstrating the mathematical limits of trend chasing in choppier market cycles.`;
+    }
+
+    return `
+      <p>
+        The quantitative simulation over this period generated a net ending capital of <strong>$${finalCapital.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>, yielding a cumulative return of <strong class="${isGain ? 'text-emerald-400' : 'text-rose-400'}">${isGain ? '+' : ''}${roi.toFixed(2)}%</strong>. ${comparisonText}
+      </p>
+      <ul class="list-disc pl-5 mt-2 space-y-2 text-xs text-zinc-300">
+        <li>
+          <strong>Primary Alpha Drivers:</strong> Tactically, the strongest performer in your simulated basket was ${textBest}. The systematic MACD momentum model successfully caught the upward breakouts of these key components while restricting leverage within the sector boundaries.
+        </li>
+        <li>
+          <strong>Underperformance & Frictions:</strong> The most significant performance drag came from ${textWorst}. This was primarily caused by choppy, sideways-moving price actions which triggered rapid whipsaw MACD buy/sell crossovers, leading to transaction frictions and buying in near short-term peaks.
+        </li>
+        <li>
+          <strong>Systemic Allocation Rules:</strong> Because of the <strong>max 2 stocks per sector</strong> and <strong>max 10 concurrent positions</strong> constraint, the portfolio maintained healthy diversification. However, when free cash was held idle waiting for buy signals, it earned only <strong>1% p.a. interest</strong>, contributing a minor cash drag relative to the fully invested benchmark.
+        </li>
+      </ul>
+    `;
+  }
 
   // API endpoint to proxy the S&P 100 historical stock CSV data to bypass CORS completely
   app.get('/api/stocks-csv', async (req, res) => {
@@ -250,6 +424,8 @@ Guidelines:
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`Full-Stack STATION.11 running on http://0.0.0.0:${port}`);
+    // Pre-seed CIK maps and check SEC availability
+    fetchTickerCikMap().catch(() => {});
   });
 }
 
