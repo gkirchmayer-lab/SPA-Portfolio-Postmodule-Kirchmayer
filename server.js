@@ -107,7 +107,7 @@ async function startServer() {
 
   // API endpoint for AI Strategic Intelligence Briefing
   app.post('/api/summary', async (req, res) => {
-    const { stocks, timeline } = req.body || { stocks: [], timeline: '1m' };
+    const { stocks, timeline, openrouterKey } = req.body || { stocks: [], timeline: '1m' };
     
     if (!stocks || stocks.length === 0) {
       return res.json({
@@ -115,7 +115,50 @@ async function startServer() {
       });
     }
 
+    const prompt = `You are a world-class financial analyst and quantitative strategist at STATION.11, an ultra-premium tactical stock intelligence dashboard.
+Analyze the following portfolio matrix:
+${stocks.map(s => `- Ticker: ${s.ticker}, Name: ${s.name}, Sector: ${s.sector}, Price: $${s.price}, Change: ${s.changePercent}%, MACD Signal: ${s.macdSignal}, Piotroski F-Score: ${s.scoreVal}/9, 1-Month Volatility: ${s.oneMonthVol.toFixed(1)}%, 1-Year Volatility: ${s.oneYearVol.toFixed(1)}%`).join('\n')}
+
+Timeline setting: ${timeline}.
+
+Produce a highly professional, dense, and tactical market intelligence briefing.
+Guidelines:
+1. Identify high-level **developments** (e.g. sectors showing synchronized MACD momentum or volatility divergence).
+2. Highlight key **things to look out for** (e.g. specific tickers with low Piotroski f-scores indicating underlying balance-sheet stress, or buy signals in high-volatility contexts).
+3. Do not include introductory filler or self-referential greetings. Start directly with the tactical takeaways.
+4. Format your entire response in beautifully typeset HTML tags: use <strong> for bold key phrases, <p> for paragraphs, and <ul class="list-disc pl-5 mt-2 space-y-2"> with <li> for bullet lists. Ensure high contrast and professional style.
+5. Limit the output to 2-3 powerful, scannable bullet points or 2 short paragraphs. Keep it extremely high signal-to-noise.`;
+
     try {
+      // If client supplied an OpenRouter API key, call the OpenRouter completion service
+      if (openrouterKey) {
+        console.log('Formulating briefing via OpenRouter API client...');
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openrouterKey}`,
+            'X-Title': 'STATION.11 Terminal'
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+
+        if (orRes.ok) {
+          const orData = await orRes.json();
+          let summaryHtml = orData.choices?.[0]?.message?.content || '';
+          summaryHtml = summaryHtml.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
+          if (summaryHtml) {
+            return res.json({ summary: summaryHtml });
+          }
+        } else {
+          const errMsg = await orRes.text();
+          console.error(`OpenRouter API error (status ${orRes.status}):`, errMsg);
+        }
+      }
+
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         console.warn('GEMINI_API_KEY environment variable is not defined. Falling back to simulated intelligent brief.');
@@ -131,24 +174,26 @@ async function startServer() {
         }
       });
 
-      const prompt = `You are a world-class financial analyst and quantitative strategist at STATION.11, an ultra-premium tactical stock intelligence dashboard.
-Analyze the following portfolio matrix:
-${stocks.map(s => `- Ticker: ${s.ticker}, Name: ${s.name}, Sector: ${s.sector}, Price: $${s.price}, Change: ${s.changePercent}%, MACD Signal: ${s.macdSignal}, Piotroski F-Score: ${s.scoreVal}/9, 1-Month Volatility: ${s.oneMonthVol.toFixed(1)}%, 1-Year Volatility: ${s.oneYearVol.toFixed(1)}%`).join('\n')}
-
-Timeline setting: ${timeline}.
-
-Produce a highly professional, dense, and tactical market intelligence briefing.
-Guidelines:
-1. Identify high-level **developments** (e.g. sectors showing synchronized MACD momentum or volatility divergence).
-2. Highlight key **things to look out for** (e.g. specific tickers with low Piotroski f-scores indicating underlying balance-sheet stress, or buy signals in high-volatility contexts).
-3. Do not include introductory filler or self-referential greetings. Start directly with the tactical takeaways.
-4. Format your entire response in beautifully typeset HTML tags: use <strong> for bold key phrases, <p> for paragraphs, and <ul class="list-disc pl-5 mt-2 space-y-2"> with <li> for bullet lists. Ensure high contrast and professional style.
-5. Limit the output to 2-3 powerful, scannable bullet points or 2 short paragraphs. Keep it extremely high signal-to-noise.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt
-      });
+      let response;
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          response = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: prompt
+          });
+          break; // Success!
+        } catch (apiError) {
+          attempts++;
+          console.warn(`Gemini attempt ${attempts} failed:`, apiError.message || apiError);
+          if (attempts >= maxAttempts) {
+            throw apiError; // Bubble up to outer catch block to trigger robust local simulation fallback
+          }
+          // Exponential backoff delay
+          await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+        }
+      }
 
       let summaryHtml = response.text || '';
       summaryHtml = summaryHtml.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -157,6 +202,24 @@ Guidelines:
     } catch (e) {
       console.error('Gemini API call failed for summary:', e);
       return res.json({ summary: getSimulatedBrief(stocks, timeline) });
+    }
+  });
+
+  // API endpoint to proxy the S&P 100 historical stock CSV data to bypass CORS completely
+  app.get('/api/stocks-csv', async (req, res) => {
+    try {
+      console.log('Proxying S&P 100 CSV download from GitHub Releases...');
+      const url = 'https://github.com/gkirchmayer-lab/SPA-Protfolio---Postmodule-Kirchmayer/releases/download/v1.0.0/sp100_ohlcv_2020_to_latest.csv';
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch CSV: status ${response.status}`);
+      }
+      const csvText = await response.text();
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      return res.send(csvText);
+    } catch (error) {
+      console.error('Error proxying S&P 100 CSV:', error);
+      return res.status(500).json({ error: 'Failed to download stock CSV' });
     }
   });
 

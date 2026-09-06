@@ -1,3 +1,5 @@
+import Papa from 'papaparse';
+
 /**
  * STATION.11 — Tactical Stock Comparison & Momentum Analytics
  * Pure Vanilla TypeScript/JavaScript Engine
@@ -9,7 +11,11 @@ let targetDate = '';
 let selectedTimeline = '1m'; // Default to 1 Month
 let manualStartDate = '';
 let twelvedataKey = '';
+let openrouterKey = '';
+let csvCompanyNames = {};
 const expandedSectorCharts = new Set();
+let csvHistoryData = null;
+let isCsvLoading = false;
 
 // Default stock roster (9 stocks to leave space for up to 11 limit)
 const DEFAULT_STOCKS = [
@@ -23,6 +29,92 @@ const DEFAULT_STOCKS = [
   { ticker: 'LLY', name: 'Eli Lilly & Co.', sector: 'Healthcare', basePrice: 760.50 },
   { ticker: 'JPM', name: 'JPMorgan Chase & Co.', sector: 'Financial Services', basePrice: 198.60 }
 ];
+
+// Load and parse the default S&P 100 historical data from GitHub releases when no Twelve Data API key is set
+async function loadCSVData() {
+  if (csvHistoryData) return csvHistoryData;
+  if (isCsvLoading) return;
+  
+  isCsvLoading = true;
+  const indicator = document.getElementById('csv-loading-indicator');
+  if (indicator) {
+    indicator.classList.remove('hidden');
+    indicator.classList.add('flex');
+  }
+  
+  try {
+    const url = '/api/stocks-csv';
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to download CSV asset');
+    
+    const csvText = await response.text();
+    
+    const parsed = Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: true
+    });
+    
+    const dataByTicker = {};
+    parsed.data.forEach(row => {
+      const ticker = row.Ticker;
+      if (!ticker) return;
+      
+      if (row.Company && !csvCompanyNames[ticker]) {
+        csvCompanyNames[ticker] = row.Company;
+      }
+      
+      if (!dataByTicker[ticker]) {
+        dataByTicker[ticker] = [];
+      }
+      
+      dataByTicker[ticker].push({
+        date: String(row.Date),
+        open: parseFloat(row.Open),
+        high: parseFloat(row.High),
+        low: parseFloat(row.Low),
+        close: parseFloat(row.Close),
+        volume: parseInt(row.Volume, 10) || 0
+      });
+    });
+    
+    Object.keys(dataByTicker).forEach(ticker => {
+      dataByTicker[ticker].sort((a, b) => a.date.localeCompare(b.date));
+    });
+    
+    csvHistoryData = dataByTicker;
+    console.log('Successfully loaded S&P 100 CSV data for', Object.keys(csvHistoryData).length, 'tickers');
+  } catch (error) {
+    console.error('Error downloading or parsing CSV:', error);
+  } finally {
+    isCsvLoading = false;
+    if (indicator) {
+      indicator.classList.remove('flex');
+      indicator.classList.add('hidden');
+    }
+  }
+  
+  return csvHistoryData;
+}
+
+// Get stock historical data from CSV (if API key not set and available) or fallback to simulated data
+function getStockHistory(stock, targetDate, daysCount) {
+  let history = [];
+  
+  if (!twelvedataKey && csvHistoryData && csvHistoryData[stock.ticker]) {
+    const allTickerHistory = csvHistoryData[stock.ticker];
+    const filteredHistory = allTickerHistory.filter(h => h.date <= targetDate);
+    if (filteredHistory.length >= 5) {
+      history = filteredHistory.slice(-(daysCount + 50));
+    }
+  }
+  
+  if (history.length < daysCount + 50) {
+    history = generateStockHistory(stock.ticker, stock.basePrice, targetDate, daysCount);
+  }
+  
+  return history;
+}
 
 // Seedable pseudo-random generator to make historical data deterministic for a given stock + date
 function createSeededRandom(seedStr) {
@@ -487,9 +579,9 @@ async function renderDashboard() {
       }
     }
 
-    // Fallback to high-quality simulated data
+    // Fallback to actual CSV data or high-quality simulated data
     if (history.length < daysCount + 50) {
-      history = generateStockHistory(stock.ticker, stock.basePrice, targetDate, daysCount);
+      history = getStockHistory(stock, targetDate, daysCount);
     }
 
     // Slice display period
@@ -765,7 +857,7 @@ async function renderDashboard() {
   });
 
   // Refresh LLM summary with latest stock changes
-  loadLLMStrategicSummary();
+  loadLLMStrategicSummary(processedStocks);
 }
 
 // F-Score Cache and Progressive Handlers
@@ -803,7 +895,10 @@ function getFScoreBadgeHtml(ticker, fScoreData) {
   let bgClass = 'bg-blue-950/20 text-blue-300 border-blue-900/40 hover:bg-blue-900/30';
   let scoreLabel = 'Medium';
   
-  if (score >= 7) {
+  if (score === 9) {
+    bgClass = 'bg-amber-950/40 text-amber-300 border-amber-500/50 hover:bg-amber-900/60 hover:border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]';
+    scoreLabel = '★ PERFECT';
+  } else if (score >= 7) {
     bgClass = 'bg-emerald-950/30 text-emerald-400 border-emerald-500/40 hover:bg-emerald-900/50';
     scoreLabel = 'Strong';
   } else if (score <= 3) {
@@ -950,20 +1045,20 @@ function showFScoreDetailsModal(data) {
   criteriaList.forEach((item, index) => {
     const isMet = item.status === 1;
     const itemEl = document.createElement('div');
-    itemEl.className = `flex justify-between items-center p-2 rounded-lg border ${isMet ? 'bg-emerald-950/10 border-emerald-900/20' : 'bg-zinc-950/50 border-zinc-900'} text-xs font-sans transition-all`;
+    itemEl.className = `flex justify-between items-center p-2.5 rounded-lg border ${isMet ? 'bg-emerald-950/20 border-emerald-500/25 text-emerald-300' : 'bg-rose-950/20 border-rose-500/25 text-rose-300'} text-xs font-sans transition-all`;
     
     const displayNum = index + 1;
 
     itemEl.innerHTML = `
       <div class="flex items-center gap-2.5">
-        <div class="flex items-center justify-center rounded-full p-1 ${isMet ? 'bg-emerald-900/10 text-emerald-400' : 'bg-zinc-900 text-zinc-600'}">
+        <div class="flex items-center justify-center rounded-full p-1 ${isMet ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}">
           ${isMet ? `
             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
           ` : `
-            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12h-15" />
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           `}
         </div>
@@ -973,7 +1068,7 @@ function showFScoreDetailsModal(data) {
         </div>
       </div>
       <div class="flex flex-col items-end">
-        <span class="font-mono text-[10px] font-bold ${isMet ? 'text-emerald-400' : 'text-zinc-600'}">${isMet ? '+1' : '0'}</span>
+        <span class="font-mono text-[10px] font-bold ${isMet ? 'text-emerald-400' : 'text-rose-400'}">${isMet ? '+1' : '0'}</span>
       </div>
     `;
     container.appendChild(itemEl);
@@ -993,6 +1088,17 @@ function closeFScoreModal() {
   }
 }
 
+function updateOpenRouterStatusDot() {
+  const dot = document.getElementById('openrouter-status-dot');
+  if (dot) {
+    if (openrouterKey) {
+      dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
+    } else {
+      dot.className = 'w-2.5 h-2.5 rounded-full bg-zinc-600';
+    }
+  }
+}
+
 // Save active stocks list to localStorage
 function saveToStorage() {
   localStorage.setItem('station11_stocks', JSON.stringify(stocks));
@@ -1006,18 +1112,14 @@ function excludeStock(ticker) {
 }
 
 // Setup Event Handlers and Listeners
-function initializeApp() {
-  // Load target date (default to today)
+async function initializeApp() {
+  // Load target date (default to September 1, 2026)
   const dateInput = document.getElementById('target-date');
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  targetDate = `${year}-${month}-${day}`;
+  targetDate = '2026-09-01';
   dateInput.value = targetDate;
 
   // Initialize manual start date to 30 days ago by default
-  const defaultManualStart = new Date();
+  const defaultManualStart = new Date('2026-09-01');
   defaultManualStart.setDate(defaultManualStart.getDate() - 30);
   const mYear = defaultManualStart.getFullYear();
   const mMonth = String(defaultManualStart.getMonth() + 1).padStart(2, '0');
@@ -1073,11 +1175,35 @@ function initializeApp() {
     stocks = [...DEFAULT_STOCKS];
   }
 
-  // Load API key if stored
+  // Load Twelve Data API key if stored
   const savedKey = localStorage.getItem('twelvedata_apikey');
   if (savedKey) {
     twelvedataKey = savedKey;
     document.getElementById('twelvedata-key').value = savedKey;
+  }
+
+  // Load OpenRouter API key if stored
+  const savedOrKey = localStorage.getItem('openrouter_apikey');
+  if (savedOrKey) {
+    openrouterKey = savedOrKey;
+    document.getElementById('openrouter-key').value = savedOrKey;
+  }
+  updateOpenRouterStatusDot();
+
+  // If no Twelve Data key is set, download and parse S&P 100 CSV data from release asset
+  if (!twelvedataKey) {
+    await loadCSVData();
+    // If we loaded the CSV successfully and the stocks roster is unexpanded, load all 100 companies!
+    if (csvHistoryData && stocks.length <= 11) {
+      const allTickers = Object.keys(csvHistoryData);
+      stocks = allTickers.map(ticker => ({
+        ticker: ticker,
+        name: csvCompanyNames[ticker] || ticker,
+        sector: 'S&P 100',
+        basePrice: csvHistoryData[ticker][csvHistoryData[ticker].length - 1]?.close || 150.0
+      }));
+      saveToStorage();
+    }
   }
 
   // Bind Target Date Events
@@ -1091,15 +1217,38 @@ function initializeApp() {
   const apiDrawer = document.getElementById('api-drawer');
   toggleApiBtn.addEventListener('click', () => {
     apiDrawer.classList.toggle('hidden');
+    document.getElementById('openrouter-drawer').classList.add('hidden');
+  });
+
+  // OpenRouter Drawer toggle
+  const toggleOrBtn = document.getElementById('toggle-openrouter-btn');
+  const orDrawer = document.getElementById('openrouter-drawer');
+  toggleOrBtn.addEventListener('click', () => {
+    orDrawer.classList.toggle('hidden');
+    apiDrawer.classList.add('hidden');
   });
 
   // Save API Key
   const saveKeyBtn = document.getElementById('save-api-key');
   const keyInput = document.getElementById('twelvedata-key');
-  saveKeyBtn.addEventListener('click', () => {
+  saveKeyBtn.addEventListener('click', async () => {
     twelvedataKey = keyInput.value.trim();
     localStorage.setItem('twelvedata_apikey', twelvedataKey);
     apiDrawer.classList.add('hidden');
+    if (!twelvedataKey) {
+      await loadCSVData();
+    }
+    renderDashboard();
+  });
+
+  // Save OpenRouter Key
+  const saveOrKeyBtn = document.getElementById('save-openrouter-key');
+  const orKeyInput = document.getElementById('openrouter-key');
+  saveOrKeyBtn.addEventListener('click', () => {
+    openrouterKey = orKeyInput.value.trim();
+    localStorage.setItem('openrouter_apikey', openrouterKey);
+    orDrawer.classList.add('hidden');
+    updateOpenRouterStatusDot();
     renderDashboard();
   });
 
@@ -1109,7 +1258,6 @@ function initializeApp() {
   const addForm = document.getElementById('add-stock-form');
   
   showAddBtn.addEventListener('click', () => {
-    if (stocks.length >= 11) return;
     addTriggerRow.classList.add('hidden');
     addForm.classList.remove('hidden');
     document.getElementById('new-ticker').focus();
@@ -1296,43 +1444,28 @@ function renderSectorMACDChart(sectorStocks, displayDays) {
 }
 
 // Fetch and render LLM Tactical Intelligence Briefing
-async function loadLLMStrategicSummary() {
+async function loadLLMStrategicSummary(processedStocks) {
   const contentDiv = document.getElementById('ai-briefing-content');
   if (!contentDiv) return;
 
-  if (stocks.length === 0) {
+  const stocksToUse = processedStocks || [];
+  if (stocksToUse.length === 0) {
     contentDiv.innerHTML = `<p class="text-zinc-500 font-mono text-[11px] uppercase">No active stocks in matrix to construct a briefing. Add stocks below to initialize.</p>`;
     return;
   }
 
   // Pre-calculate minimal information to send to the server
-  const { daysCount } = getTimelineDetails();
-  const processedPayload = stocks.map(stock => {
-    const history = generateStockHistory(stock.ticker, stock.basePrice, targetDate, daysCount);
-    const displayHistory = history.slice(-daysCount);
-    const lastDay = displayHistory[displayHistory.length - 1] || { close: stock.basePrice, open: stock.basePrice };
-    const prevDay = displayHistory[displayHistory.length - 2] || lastDay;
-    const changePercent = ((lastDay.close - prevDay.close) / prevDay.close) * 100;
-    
-    const { hist } = calculateMACD(history);
-    const macdSignal = calculateMACDSignal(hist).text;
-    
-    const fScoreCached = fScoresCache[stock.ticker];
-    const scoreVal = fScoreCached ? fScoreCached.score : 0;
-    
-    const oneMonthVol = calculateAnnualizedVolatility(history, 30);
-    const oneYearVol = calculateAnnualizedVolatility(history, history.length);
-
+  const processedPayload = stocksToUse.map(stock => {
     return {
       ticker: stock.ticker,
       name: stock.name,
       sector: stock.sector,
-      price: lastDay.close,
-      changePercent,
-      macdSignal,
-      scoreVal,
-      oneMonthVol,
-      oneYearVol
+      price: stock.lastDay.close,
+      changePercent: stock.changePercent,
+      macdSignal: stock.macdSig.text,
+      scoreVal: stock.scoreVal,
+      oneMonthVol: stock.oneMonthVol,
+      oneYearVol: stock.oneYearVol
     };
   });
 
@@ -1344,7 +1477,8 @@ async function loadLLMStrategicSummary() {
       },
       body: JSON.stringify({
         stocks: processedPayload,
-        timeline: selectedTimeline
+        timeline: selectedTimeline,
+        openrouterKey: openrouterKey
       })
     });
 
