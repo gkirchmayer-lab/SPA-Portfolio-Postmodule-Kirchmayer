@@ -207,7 +207,8 @@ Guidelines:
           },
           body: JSON.stringify({
             model: 'google/gemini-3.6-flash',
-            messages: [{ role: 'user', content: prompt }]
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 1500
           })
         });
 
@@ -303,7 +304,8 @@ Please provide a highly professional, dense, and critical strategic briefing of 
           },
           body: JSON.stringify({
             model: 'google/gemini-3.6-flash',
-            messages: [{ role: 'user', content: prompt }]
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 1500
           })
         });
 

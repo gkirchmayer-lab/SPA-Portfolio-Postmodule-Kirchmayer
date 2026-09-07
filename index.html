@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Terminal Analytics — GenAI Finance</title>
+  <title>GenAI Finance App</title>
+  <meta name="description" content="A GenAI-powered single page finance application template" />
+  <meta property="og:title" content="GenAI Finance App" />
+  <meta property="og:description" content="A GenAI-powered single page finance application template" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen selection:bg-blue-600 selection:text-white font-sans">
@@ -28,30 +31,58 @@
       </div>
 
       <!-- Date Box & Settings Panel -->
-      <div class="flex items-center gap-3 self-stretch sm:self-auto justify-between sm:justify-end">
-        <!-- OpenRouter Key Input toggle -->
-        <button id="toggle-openrouter-btn" class="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded px-3 py-2 flex items-center gap-2 transition-all cursor-pointer font-mono">
-          <span class="w-2 h-2 rounded-full bg-zinc-600" id="openrouter-status-dot"></span>
-          <span>OpenRouter API</span>
-        </button>
+      <div class="flex flex-col items-end gap-2.5 self-stretch sm:self-auto">
+        <div class="flex items-center gap-3 self-stretch sm:self-auto justify-between sm:justify-end">
+          <!-- OpenRouter Key Input toggle -->
+          <button id="toggle-openrouter-btn" class="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded px-3 py-2 flex items-center gap-2 transition-all cursor-pointer font-mono">
+            <span class="w-2 h-2 rounded-full bg-zinc-600" id="openrouter-status-dot"></span>
+            <span>OpenRouter API</span>
+          </button>
 
-        <!-- Twelve Data Key Input toggle -->
-        <button id="toggle-api-btn" class="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded px-3 py-2 flex items-center gap-2 transition-all cursor-pointer font-mono">
-          <span class="w-2 h-2 rounded-full bg-zinc-600" id="api-status-dot"></span>
-          <span>Twelve Data API</span>
-        </button>
+          <!-- Twelve Data Key Input toggle -->
+          <button id="toggle-api-btn" class="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded px-3 py-2 flex items-center gap-2 transition-all cursor-pointer font-mono">
+            <span class="w-2 h-2 rounded-full bg-zinc-600" id="api-status-dot"></span>
+            <span>Twelve Data API</span>
+          </button>
 
-        <!-- Right Top Corner Date Box -->
-        <div class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2 flex items-center gap-3 shadow-md" id="date-box-container">
-          <div class="flex flex-col text-right">
-            <span class="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Target Date</span>
-            <input type="date" id="target-date" class="bg-transparent text-sm font-semibold text-white outline-none border-none cursor-pointer focus:ring-0 p-0 text-right min-w-[120px]" />
+          <!-- Right Top Corner Dual Date Boxes -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 flex items-center gap-4 shadow-md" id="date-box-container">
+            <div class="flex items-center gap-2">
+              <div class="flex flex-col">
+                <span class="text-[10px] text-zinc-500 uppercase tracking-wider font-mono font-bold">Start Date</span>
+                <input type="date" id="global-start-date" class="bg-transparent text-xs font-semibold text-white outline-none border-none cursor-pointer focus:ring-0 p-0 font-mono" />
+              </div>
+            </div>
+            <div class="h-6 w-px bg-zinc-800 hidden sm:block"></div>
+            <div class="flex items-center gap-2">
+              <div class="flex flex-col">
+                <span class="text-[10px] text-zinc-500 uppercase tracking-wider font-mono font-bold">End Date</span>
+                <input type="date" id="global-end-date" class="bg-transparent text-xs font-semibold text-white outline-none border-none cursor-pointer focus:ring-0 p-0 font-mono" />
+              </div>
+            </div>
           </div>
-          <div class="text-zinc-500">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" />
-            </svg>
-          </div>
+        </div>
+
+        <!-- Historical Timeline Buttons (compact and aligned right) -->
+        <div class="flex items-center gap-1.5 self-end" id="timeline-selector-container">
+          <button data-timeline="1w" class="timeline-box-btn px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer">
+            1W
+          </button>
+          <button data-timeline="1m" class="timeline-box-btn px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer">
+            1M
+          </button>
+          <button data-timeline="1q" class="timeline-box-btn px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer">
+            1Q
+          </button>
+          <button data-timeline="1y" class="timeline-box-btn px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer">
+            1Y
+          </button>
+          <button data-timeline="5y" class="timeline-box-btn px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer">
+            5Y
+          </button>
+          <button data-timeline="ytd" class="timeline-box-btn px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer">
+            YTD
+          </button>
         </div>
       </div>
     </header>
@@ -72,8 +103,9 @@
         <div class="max-w-xl">
           <h3 class="text-sm font-semibold text-white font-mono">Connect Twelve Data API</h3>
           <p class="text-xs text-zinc-400 mt-1">
-            Provide your Twelve Data API key to fetch real-time market candlesticks. The app runs a ultra-smooth procedural model by default so you can browse, add, and filter tickers instantly without rate limits.
+            Provide your Twelve Data API key to fetch real-time market candlesticks. On free tier keys, we automatically prioritize and fetch the first 8 active tickers to stay within the 8 credits/min rate limit, with other tickers seamlessly falling back to our high-fidelity procedural simulation.
           </p>
+          <p id="twelvedata-error-message" class="text-xs text-rose-400 mt-2 font-mono hidden"></p>
         </div>
         <div class="flex items-center gap-2 w-full md:w-auto">
           <input type="password" id="twelvedata-key" placeholder="Your API key" class="bg-zinc-950 border border-zinc-800 rounded px-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500 w-full md:w-64 font-mono" />
@@ -123,18 +155,12 @@
               <input type="number" id="invest-capital" value="100000" min="1000" step="1000" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-blue-500" />
             </div>
 
-            <!-- Start Date -->
-            <div class="space-y-1">
-              <label for="invest-start-date" class="block text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-bold">Backtest Start Date</label>
-              <input type="date" id="invest-start-date" value="2026-01-01" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-blue-500" />
-            </div>
-
-            <!-- End Date (Synced) -->
-            <div class="space-y-1">
-              <label class="block text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-bold">Backtest End Date (Synced)</label>
-              <div class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-400 font-mono font-bold select-none cursor-not-allowed" id="invest-end-date-display">
-                2026-09-01
-              </div>
+            <!-- Globally Synced Timeframe Note -->
+            <div class="space-y-1 bg-zinc-950/80 p-3.5 rounded-lg border border-zinc-800">
+              <span class="block text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-bold">Active Simulation Timeframe</span>
+              <p class="text-xs text-zinc-400 leading-relaxed">
+                Synced to the global <span class="text-blue-400 font-semibold">Start & End Dates</span> at the top of the terminal. Both tabs operate within this identical timeframe.
+              </p>
             </div>
 
             <div class="text-[11px] text-zinc-500 leading-relaxed bg-zinc-950/40 p-3 rounded-lg border border-zinc-800/40 space-y-1">
@@ -299,8 +325,8 @@
         </div>
       </div>
 
-      <!-- Slide Button / Filter Selector & Historical Timeline Control Section -->
-      <section class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <!-- Slide Button / Filter Selector Control Section -->
+      <section class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <!-- Slide toggle for Top 30 vs All 100 -->
         <div class="flex flex-col">
           <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Display Mode</span>
@@ -311,41 +337,6 @@
             <button id="mode-top30-btn" class="flex-1 py-1.5 text-center text-[10px] font-mono font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all bg-blue-600 text-white">
               The Big 30
             </button>
-          </div>
-        </div>
-
-        <div class="flex flex-col w-full lg:w-auto">
-          <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Historical Timeline</span>
-          <div class="flex flex-wrap gap-2" id="timeline-selector-container">
-            <button data-timeline="1w" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-              1 Week
-            </button>
-            <button data-timeline="1m" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-              1 Month
-            </button>
-            <button data-timeline="1q" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-              1 Quarter
-            </button>
-            <button data-timeline="1y" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-              1 Year
-            </button>
-            <button data-timeline="5y" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-              5 Years
-            </button>
-            <button data-timeline="ytd" class="timeline-box-btn px-4 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer">
-              YTD
-            </button>
-            <button data-timeline="manual" class="timeline-box-btn px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 text-xs font-mono font-semibold transition-all cursor-pointer">
-              Manual Start
-            </button>
-          </div>
-        </div>
-
-        <!-- Manual Start Date Picker Box (Conditional on 'manual' selection) -->
-        <div id="manual-date-picker-box" class="flex flex-col">
-          <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold mb-2">Starting Date</span>
-          <div class="bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 flex items-center gap-2 shadow-inner">
-            <input type="date" id="manual-start-date" value="2026-01-01" class="bg-transparent text-sm font-mono font-bold text-white outline-none border-none cursor-pointer focus:ring-0 p-0" />
           </div>
         </div>
       </section>
